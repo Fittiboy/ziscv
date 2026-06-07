@@ -268,9 +268,36 @@ test parseBTypeInstruction {
 }
 
 test "fuzz instruction parser" {
-    try std.testing.fuzz({}, fuzzParser, .{});
+    try std.testing.fuzz({}, fuzzParser, .{ .corpus = &.{
+        @embedFile("testcases/parser-01"),
+    } });
 }
 
 fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
-    _ = smith;
+    var buf: [24]u8 = undefined;
+    var len: usize = 0;
+
+    @memcpy(buf[0..4], "add ");
+    len += 4;
+    for (0..3) |i| {
+        buf[len] = 'x';
+        len += 1;
+        len += std.fmt.printInt(
+            buf[len..],
+            smith.value(u5),
+            10,
+            .lower,
+            .{},
+        );
+        if (i == 2) break;
+        buf[len] = ',';
+        buf[len + 1] = ' ';
+        len += 2;
+    }
+
+    if (!@import("builtin").fuzz) {
+        std.debug.print("{s}\n", .{buf[0..len]});
+    }
+
+    _ = try parseInstruction(buf[0..len]);
 }
