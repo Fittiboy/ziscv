@@ -7,11 +7,6 @@ const ParserError = error{
     InvalidRegister,
 };
 
-const r_types = [_][]const u8{ "add", "sub", "and", "or", "slt" };
-const i_types = [_][]const u8{"lw"};
-const s_types = [_][]const u8{"sw"};
-const b_types = [_][]const u8{"beq"};
-
 const Command = enum { add, sub, @"and", @"or", slt, lw, sw, beq };
 
 /// Parses a line of the project's RISC-V Assembly subset into
@@ -295,9 +290,9 @@ fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
         len += 2;
     }
 
-    if (!@import("builtin").fuzz) {
-        std.debug.print("{s}\n", .{buf[0..len]});
-    }
+    // if (!@import("builtin").fuzz) {
+    //     std.debug.print("{s}\n", .{buf[0..len]});
+    // }
 
     _ = try parseInstruction(buf[0..len]);
 }
