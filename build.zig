@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
     const lib_test = b.addTest(.{
         .root_module = lib_mod,
         .name = "lib_test",
+        .use_llvm = true,
     });
 
     const lib_test_step = b.step("test-lib", "Test the library");
@@ -46,6 +47,7 @@ pub fn build(b: *std.Build) void {
     const exe_test = b.addTest(.{
         .root_module = exe_mod,
         .name = "exe_test",
+        .use_llvm = true,
     });
 
     const exe_test_step = b.step("test-exe", "Test the exerary");

@@ -4,9 +4,9 @@ pub const assembler = @import("assembler.zig");
 pub const InstructionType = enum { r, i, s, b };
 
 pub const RType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, rs2: u5, funct7: u7 };
-pub const IType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, imm12: i12 };
-pub const SType = packed struct(u32) { op: u7, imm5: i5, funct3: u3, rs1: u5, rs2: u5, imm7: i7 };
-pub const BType = packed struct(u32) { op: u7, imm5: i5, funct3: u3, rs1: u5, rs2: u5, imm7: i7 };
+pub const IType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, imm12: u12 };
+pub const SType = packed struct(u32) { op: u7, imm5: u5, funct3: u3, rs1: u5, rs2: u5, imm7: u7 };
+pub const BType = packed struct(u32) { op: u7, imm5: u5, funct3: u3, rs1: u5, rs2: u5, imm7: u7 };
 
 pub const MachineInstruction = packed union(u32) {
     raw: u32,
