@@ -262,7 +262,7 @@ test parseBTypeInstruction {
     }
 }
 
-test "fuzz instruction parser" {
+test "fuzz instruction parser valid" {
     try std.testing.fuzz({}, fuzzParser, .{ .corpus = &.{
         @embedFile("testcases/parser-01"),
     } });
@@ -295,4 +295,14 @@ fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
     // }
 
     _ = try parseInstruction(buf[0..len]);
+}
+
+test "fuzz instruction parser random bytes" {
+    try std.testing.fuzz({}, fuzzParserGarbage, .{});
+}
+
+fn fuzzParserGarbage(_: void, smith: *std.testing.Smith) !void {
+    var buf: [24]u8 = undefined;
+    smith.bytes(&buf);
+    _ = parseInstruction(&buf) catch return;
 }
