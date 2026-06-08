@@ -5,9 +5,22 @@ const ParserError = error{
     InvalidInstruction,
     IncompleteInstruction,
     InvalidRegister,
+    LineTooLong,
+    WriteFailed,
 };
 
 const Command = enum { add, sub, @"and", @"or", slt, lw, sw, beq };
+
+/// Parses an entire program, assuming each line contains an instruction.
+/// Comments are allowed, but have to share a line with an instruction.
+/// Labels are not supported, and neither are register names other than
+/// the default x0-x31.
+pub fn parseProgram(prog_reader: *std.Io.Reader, prog_writer: *std.Io.Writer) ParserError!void {
+    while (prog_reader.takeDelimiter('\n') catch return ParserError.LineTooLong) |l| {
+        const instruction = try parseInstruction(l);
+        try prog_writer.writeAll(&@as([4]u8, @bitCast(instruction)));
+    } else return;
+}
 
 /// Parses a line of the project's RISC-V Assembly subset into
 /// the corresponding machine code instruction.
@@ -184,6 +197,44 @@ fn parseRegister(str: []const u8) ParserError!u5 {
     };
 }
 
+// -------------------------------------------
+// |                                         |
+// |             THE TEST ZONE               |
+// |                                         |
+// -------------------------------------------
+
+test parseProgram {
+    const program =
+        \\add x0, x1, x2
+        \\sub x3, x4, x5
+        \\lw x0, 115(x1)
+        \\lw x3 -133(x4) # Comments allowed, commas can be ignored!
+        \\sw x0, 115(x1) # With comment
+        \\sw x3 -133(x4) # Missing commas are fine
+        \\beq x27, x23, -12
+        \\beq x22, x0, 116 # Comment? Yes, please!
+    ;
+    var prog_reader: std.Io.Reader = .fixed(program[0..program.len]);
+
+    var machine_code: [8 * 4]u8 = undefined;
+    var machine_code_writer: std.Io.Writer = .fixed(&machine_code);
+
+    try parseProgram(&prog_reader, &machine_code_writer);
+
+    const expected: [8 * 4]u8 = [_]u8{
+        0x33, 0x80, 0x20, 0x00,
+        0xb3, 0x01, 0x52, 0x40,
+        0x03, 0xa0, 0x30, 0x07,
+        0x83, 0x21, 0xb2, 0xf7,
+        0xa3, 0xa9, 0x00, 0x06,
+        0xa3, 0x2d, 0x32, 0xf6,
+        0xe3, 0x8a, 0x7d, 0xff,
+        0x63, 0x0a, 0x0b, 0x06,
+    };
+
+    try std.testing.expectEqualStrings(&expected, &machine_code);
+}
+
 test parseInstruction {
     const instruction = try parseInstruction("add x0, x1, x2");
 
@@ -304,9 +355,9 @@ fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
         },
     }
 
-    if (!@import("builtin").fuzz) {
-        std.debug.print("Regression test for : '{s}'\n", .{buf[0..len]});
-    }
+    // if (!@import("builtin").fuzz) {
+    //     std.debug.print("Regression test for : '{s}'\n", .{buf[0..len]});
+    // }
 
     _ = try parseInstruction(buf[0..len]);
 }
