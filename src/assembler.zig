@@ -194,8 +194,8 @@ test parseRTypeInstruction {
     const instructions = [_][]const u8{
         "add x0, x1, x2",
         "sub x3, x4, x5",
-        "and x6, x7, x12",
-        "or  x3, x8, x27",
+        "and x6, x7, x12 # Comments allowed!",
+        "or  x3 x8 x27 # Commas not needed!",
         "slt x5, x14, x21",
     };
 
@@ -215,7 +215,7 @@ test parseRTypeInstruction {
 test parseITypeInstruction {
     const instructions = [_][]const u8{
         "lw x0, 115(x1)",
-        "lw x3, -133(x4)",
+        "lw x3 -133(x4) # Comments allowed, commas can be ignored!",
     };
 
     const expected = [_]ziscv.MachineInstruction{
@@ -230,8 +230,8 @@ test parseITypeInstruction {
 
 test parseSTypeInstruction {
     const instructions = [_][]const u8{
-        "sw x0, 115(x1)",
-        "sw x3, -133(x4)",
+        "sw x0, 115(x1) # With comment",
+        "sw x3 -133(x4) # Missing commas are fine",
     };
 
     const expected = [_]ziscv.MachineInstruction{
@@ -247,8 +247,8 @@ test parseSTypeInstruction {
 test parseBTypeInstruction {
     const instructions = [_][]const u8{
         "beq x27, x23, -12",
-        "beq x22, x0, 116",
-        "beq x4, x1, 1700",
+        "beq x22, x0, 116 # Comment? Yes, please!",
+        "beq x4 x1 1700 # Commas? No thank you!",
     };
 
     const expected = [_]ziscv.MachineInstruction{
@@ -263,38 +263,72 @@ test parseBTypeInstruction {
 }
 
 test "fuzz instruction parser valid" {
-    try std.testing.fuzz({}, fuzzParser, .{ .corpus = &.{
-        @embedFile("testcases/parser-01"),
-    } });
+    try std.testing.fuzz({}, fuzzParser, .{});
 }
 
 fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
     var buf: [24]u8 = undefined;
     var len: usize = 0;
 
-    @memcpy(buf[0..4], "add ");
-    len += 4;
-    for (0..3) |i| {
-        buf[len] = 'x';
+    const command = smith.value(Command);
+    const cmd_str = @tagName(command);
+    for (cmd_str) |c| {
+        buf[len] = c;
         len += 1;
-        len += std.fmt.printInt(
-            buf[len..],
-            smith.value(u5),
-            10,
-            .lower,
-            .{},
-        );
-        if (i == 2) break;
-        buf[len] = ',';
-        buf[len + 1] = ' ';
-        len += 2;
+    }
+    buf[len] = ' ';
+    len += 1;
+
+    // All instructions include one register after
+    // the mnemonic.
+    len += printRegister(buf[len..], smith, .comma);
+
+    switch (command) {
+        .add, .sub, .@"and", .@"or", .slt => {
+            len += printRegister(buf[len..], smith, .comma);
+            len += printRegister(buf[len..], smith, .no_comma);
+        },
+        .lw, .sw => {
+            const imm = smith.value(i12);
+            len += std.fmt.printInt(buf[len..], imm, 10, .lower, .{});
+            buf[len] = '(';
+            len += 1;
+            len += printRegister(buf[len..], smith, .no_comma);
+            buf[len] = ')';
+            len += 1;
+        },
+        .beq => {
+            len += printRegister(buf[len..], smith, .comma);
+            const imm: i13 = @as(i13, @intCast(smith.value(i12))) << 1;
+            len += std.fmt.printInt(buf[len..], imm, 10, .lower, .{});
+        },
     }
 
-    // if (!@import("builtin").fuzz) {
-    //     std.debug.print("{s}\n", .{buf[0..len]});
-    // }
+    if (!@import("builtin").fuzz) {
+        std.debug.print("Regression test for : '{s}'\n", .{buf[0..len]});
+    }
 
     _ = try parseInstruction(buf[0..len]);
+}
+
+fn printRegister(
+    buf: []u8,
+    smith: *std.testing.Smith,
+    end: enum { comma, no_comma },
+) usize {
+    var len: usize = 0;
+    buf[0] = 'x';
+    len += 1;
+    len += std.fmt.printInt(buf[len..], smith.value(u5), 10, .lower, .{});
+    switch (end) {
+        .comma => {
+            buf[len] = ',';
+            buf[len + 1] = ' ';
+            len += 2;
+        },
+        .no_comma => {},
+    }
+    return len;
 }
 
 test "fuzz instruction parser random bytes" {
