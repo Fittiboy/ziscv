@@ -1,5 +1,28 @@
 const std = @import("std");
-const ziscv = @import("root.zig");
+
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+
+    var args_iter = init.minimal.args.iterate();
+    _ = args_iter.skip();
+    const filename = args_iter.next() orelse {
+        std.process.fatal("No input file provided", .{});
+    };
+    const cwd = std.Io.Dir.cwd();
+
+    const file = cwd.openFile(io, filename, .{ .allow_directory = false }) catch |err| {
+        std.process.fatal("when trying to open file \"{s}\": {s}", .{ filename, @errorName(err) });
+    };
+    var reader_buf: [1024]u8 = undefined;
+    var file_reader = file.reader(io, &reader_buf);
+    const reader: *std.Io.Reader = &file_reader.interface;
+
+    var stdout_buf: [1024]u8 = undefined;
+    var stdout_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buf);
+    const stdout: *std.Io.Writer = &stdout_writer.interface;
+
+    try parseProgram(reader, stdout);
+}
 
 const ParserError = error{
     InvalidInstruction,
@@ -11,6 +34,23 @@ const ParserError = error{
 
 const Command = enum { add, sub, @"and", @"or", slt, lw, sw, beq };
 
+pub const RType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, rs2: u5, funct7: u7 };
+pub const IType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, imm12: u12 };
+pub const SType = packed struct(u32) { op: u7, imm5: u5, funct3: u3, rs1: u5, rs2: u5, imm7: u7 };
+pub const BType = packed struct(u32) { op: u7, imm5: u5, funct3: u3, rs1: u5, rs2: u5, imm7: u7 };
+
+pub const MachineInstruction = packed union(u32) {
+    raw: u32,
+    with_op: packed struct(u32) {
+        op: u7,
+        raw_rest: u25,
+    },
+    rtype: RType,
+    itype: IType,
+    stype: SType,
+    btype: BType,
+};
+
 /// Parses an entire program, assuming each line contains an instruction.
 /// Comments are allowed, but have to share a line with an instruction.
 /// Labels are not supported, and neither are register names other than
@@ -19,13 +59,14 @@ pub fn parseProgram(prog_reader: *std.Io.Reader, prog_writer: *std.Io.Writer) Pa
     while (prog_reader.takeDelimiter('\n') catch return ParserError.LineTooLong) |l| {
         const instruction = try parseInstruction(l);
         try prog_writer.writeAll(&@as([4]u8, @bitCast(instruction)));
+        try prog_writer.flush();
     } else return;
 }
 
 /// Parses a line of the project's RISC-V Assembly subset into
 /// the corresponding machine code instruction.
 /// Asserts that the input is not empty.
-pub fn parseInstruction(str: []const u8) ParserError!ziscv.MachineInstruction {
+pub fn parseInstruction(str: []const u8) ParserError!MachineInstruction {
     std.debug.assert(str.len > 0);
     var tok = std.mem.tokenizeAny(u8, str, ", ");
     const mnemonic = std.meta.stringToEnum(Command, tok.next().?) orelse return error.InvalidInstruction;
@@ -37,7 +78,7 @@ pub fn parseInstruction(str: []const u8) ParserError!ziscv.MachineInstruction {
     };
 }
 
-fn parseRTypeInstruction(mnemonic: Command, tok: *std.mem.TokenIterator(u8, .any)) ParserError!ziscv.MachineInstruction {
+fn parseRTypeInstruction(mnemonic: Command, tok: *std.mem.TokenIterator(u8, .any)) ParserError!MachineInstruction {
     const funct3: u3 = switch (mnemonic) {
         .add, .sub => 0,
         .@"and" => 7,
@@ -83,7 +124,7 @@ fn parseImmOffsetRegister(comptime ImmType: type, str: []const u8) ParserError!@
 fn parseITypeInstruction(
     mnemonic: Command,
     tok: *std.mem.TokenIterator(u8, .any),
-) ParserError!ziscv.MachineInstruction {
+) ParserError!MachineInstruction {
     const funct3: u3 = switch (mnemonic) {
         .lw => 2,
         else => unreachable,
@@ -111,7 +152,7 @@ fn parseITypeInstruction(
 fn parseSTypeInstruction(
     mnemonic: Command,
     tok: *std.mem.TokenIterator(u8, .any),
-) ParserError!ziscv.MachineInstruction {
+) ParserError!MachineInstruction {
     const funct3: u3 = switch (mnemonic) {
         .sw => 2,
         else => unreachable,
@@ -148,7 +189,7 @@ fn parseSTypeInstruction(
 fn parseBTypeInstruction(
     mnemonic: Command,
     tok: *std.mem.TokenIterator(u8, .any),
-) ParserError!ziscv.MachineInstruction {
+) ParserError!MachineInstruction {
     const funct3: u3 = switch (mnemonic) {
         .beq => 0,
         else => unreachable,
@@ -250,7 +291,7 @@ test parseRTypeInstruction {
         "slt x5, x14, x21",
     };
 
-    const expected = [_]ziscv.MachineInstruction{
+    const expected = [_]MachineInstruction{
         .{ .raw = 0x00208033 },
         .{ .raw = 0x405201b3 },
         .{ .raw = 0x00c3f333 },
@@ -269,7 +310,7 @@ test parseITypeInstruction {
         "lw x3 -133(x4) # Comments allowed, commas can be ignored!",
     };
 
-    const expected = [_]ziscv.MachineInstruction{
+    const expected = [_]MachineInstruction{
         .{ .raw = 0x0730a003 },
         .{ .raw = 0xf7b22183 },
     };
@@ -285,7 +326,7 @@ test parseSTypeInstruction {
         "sw x3 -133(x4) # Missing commas are fine",
     };
 
-    const expected = [_]ziscv.MachineInstruction{
+    const expected = [_]MachineInstruction{
         .{ .raw = 0x0600a9a3 },
         .{ .raw = 0xf6322da3 },
     };
@@ -302,7 +343,7 @@ test parseBTypeInstruction {
         "beq x4 x1 1700 # Commas? No thank you!",
     };
 
-    const expected = [_]ziscv.MachineInstruction{
+    const expected = [_]MachineInstruction{
         .{ .raw = 0xff7d8ae3 },
         .{ .raw = 0x060b0a63 },
         .{ .raw = 0x6a120263 },
