@@ -127,7 +127,7 @@ pub const Machine = struct {
     }
 
     fn nextInstruction(self: Self) ?Instruction {
-        if (self.pc >= self.prog_len) return null;
+        if (self.pc == self.prog_len) return null;
         const raw_instruction: u32 = @bitCast(self.fetchWord(self.pc));
         return Self.parseInstruction(raw_instruction);
     }
