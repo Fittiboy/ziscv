@@ -52,10 +52,20 @@ pub const Machine = struct {
     pub fn simulate(self: *Self) !void {
         self.pc = 0x00000000;
 
-        while (self.pc < self.prog_len) {
-            self.pc += 1;
+        while (self.nextInstruction()) |instruction| {
+            std.debug.print("Instruction: 0x{X:0>8}\n", .{instruction});
+            self.pc += 4;
         }
 
-        std.debug.print("PC: 0x{X}\n", .{self.pc});
+        std.debug.print("PC         : 0x{X:0>8}\n", .{self.pc});
+    }
+
+    fn fetchWord(self: Self, addr: usize) u32 {
+        return std.mem.readInt(u32, self.memory[addr..][0..4], .little);
+    }
+
+    fn nextInstruction(self: Self) ?u32 {
+        if (self.pc >= self.prog_len) return null;
+        return self.fetchWord(self.pc);
     }
 };
