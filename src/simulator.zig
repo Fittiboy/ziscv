@@ -62,18 +62,16 @@ pub const Machine = struct {
         self.pc = 0x00000000;
 
         while (self.nextInstruction()) |instruction| {
-            std.debug.print("Instruction: 0x{X:0>8}\n", .{self.fetchWordUnsigned(self.pc)});
+            // std.debug.print("Instruction: 0x{X:0>8}\n", .{self.fetchWordUnsigned(self.pc)});
             self.handle(instruction) catch |err| {
                 std.process.fatal("handling 0x{X:0>8}: {s}", .{ self.fetchWordUnsigned(self.pc), @errorName(err) });
             };
             if (instruction != .btype) self.pc += 4;
         }
-
-        std.debug.print("PC         : 0x{X:0>8}\n", .{self.pc});
     }
 
     fn handle(self: *Self, instr: Instruction) !void {
-        std.debug.print("{any}\n", .{instr});
+        // std.debug.print("{any}\n", .{instr});
         switch (instr) {
             .rtype => |r| switch (r.cmd) {
                 .add => self.writeRegister(r.rd, r.rs1 + r.rs2),
@@ -136,7 +134,6 @@ pub const Machine = struct {
 
     fn parseInstruction(raw: u32) Instruction {
         const raw_machine: MachineInstruction = .{ .raw = raw };
-        //  add, sub, @"and", @"or", slt, addi, lw, sw, beq ;
         switch (raw_machine.with_op.op) {
             51 => return .{
                 .rtype = .{
