@@ -34,7 +34,7 @@ const ParserError = error{
     WriteFailed,
 };
 
-pub const Command = enum { add, sub, @"and", @"or", slt, addi, lw, sw, beq };
+pub const Command = enum { add, sub, @"or", @"and", slt, addi, lw, sw, beq };
 
 pub const RType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, rs2: u5, funct7: u7 };
 pub const IType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, imm12: u12 };
