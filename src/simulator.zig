@@ -64,7 +64,7 @@ pub const Machine = struct {
         while (self.nextInstruction()) |instruction| {
             std.debug.print("Instruction: 0x{X:0>8}\n", .{self.fetchWordUnsigned(self.pc)});
             self.handle(instruction) catch |err| {
-                std.process.fatal("handling 0x{X:0>8}: {s}", .{ self.fetchWord(self.pc), @errorName(err) });
+                std.process.fatal("handling 0x{X:0>8}: {s}", .{ self.fetchWordUnsigned(self.pc), @errorName(err) });
             };
             if (instruction != .btype) self.pc += 4;
         }
@@ -114,6 +114,7 @@ pub const Machine = struct {
     }
 
     fn storeWord(self: *Self, word: i32, addr: u32) !void {
+        if (addr <= self.prog_len) return error.InstructionOverwrite;
         if (addr >= self.memory.len) return error.InvalidAddress;
         const as_bytes: [4]u8 = @bitCast(word);
         @memcpy(self.memory[addr .. addr + 4], &as_bytes);
@@ -174,7 +175,7 @@ pub const Machine = struct {
                         .cmd = .sw,
                         .rs1 = raw_machine.stype.rs1,
                         .rs2 = raw_machine.stype.rs2,
-                        .offset = offset_upper_7 + @as(i5, @bitCast(raw_machine.stype.imm5)),
+                        .offset = offset_upper_7 + @as(u5, @bitCast(raw_machine.stype.imm5)),
                     },
                 };
             },
