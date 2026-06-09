@@ -32,7 +32,7 @@ const ParserError = error{
     WriteFailed,
 };
 
-const Command = enum { add, sub, @"and", @"or", slt, lw, sw, beq };
+const Command = enum { add, sub, @"and", @"or", slt, addi, lw, sw, beq };
 
 pub const RType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, rs2: u5, funct7: u7 };
 pub const IType = packed struct(u32) { op: u7, rd: u5, funct3: u3, rs1: u5, imm12: u12 };
@@ -72,7 +72,7 @@ pub fn parseInstruction(str: []const u8) ParserError!MachineInstruction {
     const mnemonic = std.meta.stringToEnum(Command, tok.next().?) orelse return error.InvalidInstruction;
     return switch (mnemonic) {
         .add, .sub, .@"and", .@"or", .slt => parseRTypeInstruction(mnemonic, &tok),
-        .lw => parseITypeInstruction(mnemonic, &tok),
+        .lw, .addi => parseITypeInstruction(mnemonic, &tok),
         .sw => parseSTypeInstruction(mnemonic, &tok),
         .beq => parseBTypeInstruction(mnemonic, &tok),
     };
@@ -125,8 +125,9 @@ fn parseITypeInstruction(
     mnemonic: Command,
     tok: *std.mem.TokenIterator(u8, .any),
 ) ParserError!MachineInstruction {
-    const funct3: u3 = switch (mnemonic) {
-        .lw => 2,
+    const op: u7, const funct3: u3 = switch (mnemonic) {
+        .addi => .{ 19, 0 },
+        .lw => .{ 3, 2 },
         else => unreachable,
     };
 
@@ -135,13 +136,29 @@ fn parseITypeInstruction(
     const rd_str = tok.next() orelse return ParserError.IncompleteInstruction;
     registers[0] = try parseRegister(rd_str);
 
-    const imm_rs1_str = tok.next() orelse return ParserError.IncompleteInstruction;
-    const imm12: i12, registers[1] = try parseImmOffsetRegister(i12, imm_rs1_str);
+    const imm12, registers[1] = switch (mnemonic) {
+        .addi => blk: {
+            const rs1_str = tok.next() orelse return ParserError.IncompleteInstruction;
+            const rs1 = try parseRegister(rs1_str);
+            const imm12_str = tok.next() orelse return ParserError.IncompleteInstruction;
+            break :blk .{
+                std.fmt.parseInt(i12, imm12_str, 10) catch {
+                    return ParserError.InvalidInstruction;
+                },
+                rs1,
+            };
+        },
+        .lw => blk: {
+            const imm_rs1_str = tok.next() orelse return ParserError.IncompleteInstruction;
+            break :blk try parseImmOffsetRegister(i12, imm_rs1_str);
+        },
+        else => unreachable,
+    };
 
     if (tok.next()) |str| if (str[0] != '#') return ParserError.InvalidInstruction;
 
     return .{ .itype = .{
-        .op = 3,
+        .op = op,
         .rd = registers[0],
         .funct3 = funct3,
         .rs1 = registers[1],
@@ -153,10 +170,7 @@ fn parseSTypeInstruction(
     mnemonic: Command,
     tok: *std.mem.TokenIterator(u8, .any),
 ) ParserError!MachineInstruction {
-    const funct3: u3 = switch (mnemonic) {
-        .sw => 2,
-        else => unreachable,
-    };
+    _ = mnemonic;
 
     var registers: [2]u5 = undefined;
 
@@ -179,7 +193,7 @@ fn parseSTypeInstruction(
     return .{ .stype = .{
         .op = 35,
         .imm5 = imm_structured.split.imm5,
-        .funct3 = funct3,
+        .funct3 = 2,
         .rs1 = registers[1],
         .rs2 = registers[0],
         .imm7 = imm_structured.split.imm7,
@@ -190,10 +204,7 @@ fn parseBTypeInstruction(
     mnemonic: Command,
     tok: *std.mem.TokenIterator(u8, .any),
 ) ParserError!MachineInstruction {
-    const funct3: u3 = switch (mnemonic) {
-        .beq => 0,
-        else => unreachable,
-    };
+    _ = mnemonic;
 
     var registers: [2]u5 = undefined;
     for (0..2) |i| {
@@ -224,7 +235,7 @@ fn parseBTypeInstruction(
     return .{ .btype = .{
         .op = 99,
         .imm5 = (@as(u5, @intCast(imm_structured.split.imm4)) << 1) + imm_structured.split.imm1,
-        .funct3 = funct3,
+        .funct3 = 0,
         .rs1 = registers[0],
         .rs2 = registers[1],
         .imm7 = (@as(u7, @intCast(imm_structured.split.sign)) << 6) + imm_structured.split.imm6,
@@ -249,7 +260,7 @@ test parseProgram {
         \\add x0, x1, x2
         \\sub x3, x4, x5
         \\lw x0, 115(x1)
-        \\lw x3 -133(x4) # Comments allowed, commas can be ignored!
+        \\addi x3 x3 -133 # Comments allowed, commas can be ignored!
         \\sw x0, 115(x1) # With comment
         \\sw x3 -133(x4) # Missing commas are fine
         \\beq x27, x23, -12
@@ -266,7 +277,7 @@ test parseProgram {
         0x33, 0x80, 0x20, 0x00,
         0xb3, 0x01, 0x52, 0x40,
         0x03, 0xa0, 0x30, 0x07,
-        0x83, 0x21, 0xb2, 0xf7,
+        0x93, 0x81, 0xb1, 0xf7,
         0xa3, 0xa9, 0x00, 0x06,
         0xa3, 0x2d, 0x32, 0xf6,
         0xe3, 0x8a, 0x7d, 0xff,
@@ -307,12 +318,12 @@ test parseRTypeInstruction {
 test parseITypeInstruction {
     const instructions = [_][]const u8{
         "lw x0, 115(x1)",
-        "lw x3 -133(x4) # Comments allowed, commas can be ignored!",
+        "addi x3 x3 -133 # Comments allowed, commas can be ignored!",
     };
 
     const expected = [_]MachineInstruction{
         .{ .raw = 0x0730a003 },
-        .{ .raw = 0xf7b22183 },
+        .{ .raw = 0xf7b18193 },
     };
 
     for (instructions, expected) |i, e| {
@@ -392,6 +403,11 @@ fn fuzzParser(_: void, smith: *std.testing.Smith) !void {
         .beq => {
             len += printRegister(buf[len..], smith, .comma);
             const imm: i13 = @as(i13, @intCast(smith.value(i12))) << 1;
+            len += std.fmt.printInt(buf[len..], imm, 10, .lower, .{});
+        },
+        .addi => {
+            len += printRegister(buf[len..], smith, .comma);
+            const imm: i12 = smith.value(i12);
             len += std.fmt.printInt(buf[len..], imm, 10, .lower, .{});
         },
     }
