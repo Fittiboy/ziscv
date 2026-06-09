@@ -23,7 +23,7 @@ pub fn main(init: std.process.Init) !void {
     var stdout_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buf);
     const stdout: *std.Io.Writer = &stdout_writer.interface;
 
-    var machine: Machine = try .init(reader);
+    var machine: Machine = try .fromProgramReader(reader);
 
     try machine.simulate();
     const memory: *[32 * 4 * 1024 * 4]u8 = @ptrCast(&machine.memory);
@@ -42,7 +42,7 @@ pub const Machine = struct {
 
     const fresh: Self = .{};
 
-    pub fn init(prog_reader: *std.Io.Reader) !Self {
+    pub fn fromProgramReader(prog_reader: *std.Io.Reader) !Self {
         var machine: Self = .fresh;
         const memory: *[32 * 4 * 1024 * 4]u8 = @ptrCast(&machine.memory);
         var mem_writer: std.Io.Writer = .fixed(memory);
