@@ -26,9 +26,8 @@ pub fn main(init: std.process.Init) !void {
     var machine: Machine = try .fromProgramReader(reader);
 
     try machine.simulate();
-    const memory: *[32 * 4 * 1024 * 4]u8 = @ptrCast(&machine.memory);
 
-    try stdout.writeAll(memory);
+    try stdout.writeAll(&machine.memory);
     try stdout.flush();
 }
 
@@ -37,21 +36,26 @@ pub const Machine = struct {
 
     prog_len: usize = 0,
     pc: u32 = 0x00000000,
-    register_bank: [32]u32 = @splat(0x00000000),
-    memory: [32 * 4 * 1024]u32 = undefined,
+    register_bank: [32 * 4]u8 = @splat(0x00000000),
+    memory: [32 * 4 * 1024]u8 = undefined,
 
     const fresh: Self = .{};
 
     pub fn fromProgramReader(prog_reader: *std.Io.Reader) !Self {
         var machine: Self = .fresh;
-        const memory: *[32 * 4 * 1024 * 4]u8 = @ptrCast(&machine.memory);
-        var mem_writer: std.Io.Writer = .fixed(memory);
+        var mem_writer: std.Io.Writer = .fixed(&machine.memory);
         machine.prog_len = try prog_reader.streamRemaining(&mem_writer);
 
         return machine;
     }
 
     pub fn simulate(self: *Self) !void {
-        _ = self;
+        self.pc = 0x00000000;
+
+        while (self.pc < self.prog_len) {
+            self.pc += 1;
+        }
+
+        std.debug.print("PC: 0x{X}\n", .{self.pc});
     }
 };
