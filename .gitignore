@@ -2,3 +2,4 @@ zig-out
 .zig-cache
 debug.bin
 debug.S
+debug_dump.bin
