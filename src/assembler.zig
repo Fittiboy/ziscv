@@ -5,6 +5,7 @@ pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
 
     var args_iter = try init.minimal.args.iterateAllocator(gpa);
+    defer args_iter.deinit();
     _ = args_iter.skip();
     const filename = args_iter.next() orelse {
         std.process.fatal("No input file provided", .{});
