@@ -7,7 +7,7 @@ pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const gpa = init.gpa;
 
-    const file = file_helper.openInputFile(init, io, gpa);
+    const file = try file_helper.openInputFile(init, io, gpa);
     defer file.close(io);
 
     var reader_buf: [1024]u8 = undefined;
