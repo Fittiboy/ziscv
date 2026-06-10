@@ -61,7 +61,8 @@ pub const MachineInstruction = packed union(u32) {
 /// the default x0-x31.
 pub fn parseProgram(prog_reader: *std.Io.Reader, prog_writer: *std.Io.Writer) ParserError!void {
     while (prog_reader.takeDelimiter('\n') catch return ParserError.LineTooLong) |l| {
-        const instruction = try parseInstruction(l);
+        const trimmed = std.mem.trim(u8, l, "\n\r");
+        const instruction = try parseInstruction(trimmed);
         try prog_writer.writeAll(&@as([4]u8, @bitCast(instruction)));
         try prog_writer.flush();
     } else return;
