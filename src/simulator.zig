@@ -4,8 +4,10 @@ const Command = @import("assembler.zig").Command;
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
+    const gpa = init.gpa;
 
-    var args_iter = init.minimal.args.iterate();
+    var args_iter = try init.minimal.args.iterateAllocator(gpa);
+    defer args_iter.deinit();
     _ = args_iter.skip();
     const filename = args_iter.next() orelse {
         std.process.fatal("No input file provided", .{});
