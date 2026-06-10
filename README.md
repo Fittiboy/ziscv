@@ -5,8 +5,7 @@ It runs on 128KiB of unified instruction and data memory.
 
 ## Building
 ### Zig version
-I use the Zig master branch for educational projects like these, so the build script may break.
-The plan is to update `build.zig` for version 0.17.0 when it comes out, if it is no longer compatible by then.
+This branch of the project uses Zig version 0.16.0.
 
 ### Build process
 Run `zig build`, and you will find `ziscv-assembler` and `ziscv-simulator` in `./zig-out/bin/`.
