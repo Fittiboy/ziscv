@@ -1,7 +1,7 @@
 const std = @import("std");
 const native_os = @import("builtin").os.tag;
 
-pub fn openInputFile(init: std.process.Init, io: std.Io, gpa: std.mem.Allocator) std.Io.File {
+pub fn openInputFile(init: std.process.Init, io: std.Io, gpa: std.mem.Allocator) !std.Io.File {
     var args_iter = switch (native_os) {
         .wasi, .windows => try init.minimal.args.iterateAllocator(gpa),
         else => init.minimal.args.iterate(),
