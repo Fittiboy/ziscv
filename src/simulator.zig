@@ -191,7 +191,7 @@ pub const Machine = struct {
                     },
                 };
             },
-            else => unreachable,
+            else => |op| std.process.fatal("unhandled op: {}", .{op}),
         }
     }
 };
