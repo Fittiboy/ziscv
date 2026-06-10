@@ -1,24 +1,12 @@
 const std = @import("std");
+const file_helper = @import("file_helper.zig");
 const native_os = @import("builtin").os.tag;
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const gpa = init.gpa;
 
-    var args_iter = switch (native_os) {
-        .wasi, .windows => try init.minimal.args.iterateAllocator(gpa),
-        else => init.minimal.args.iterate(),
-    };
-    defer args_iter.deinit();
-    _ = args_iter.skip();
-    const filename = args_iter.next() orelse {
-        std.process.fatal("No input file provided", .{});
-    };
-    const cwd = std.Io.Dir.cwd();
-
-    const file = cwd.openFile(io, filename, .{ .allow_directory = false }) catch |err| {
-        std.process.fatal("when trying to open file \"{s}\": {s}", .{ filename, @errorName(err) });
-    };
+    const file = file_helper.openInputFile(init, io, gpa);
     defer file.close(io);
 
     var reader_buf: [1024]u8 = undefined;
@@ -65,7 +53,10 @@ pub const MachineInstruction = packed union(u32) {
 /// the default x0-x31.
 pub fn parseProgram(prog_reader: *std.Io.Reader, prog_writer: *std.Io.Writer) ParserError!void {
     while (prog_reader.takeDelimiter('\n') catch return ParserError.LineTooLong) |l| {
-        const trimmed = std.mem.trim(u8, l, "\n\r");
+        const trimmed = switch (native_os) {
+            .windows, .wasi => std.mem.trim(u8, l, "\n\r"),
+            else => l,
+        };
         const instruction = try parseInstruction(trimmed);
         try prog_writer.writeAll(&@as([4]u8, @bitCast(instruction)));
         try prog_writer.flush();
