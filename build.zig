@@ -27,12 +27,12 @@ pub fn build(b: *std.Build) void {
 
     const simulator_run_step = b.step("simulate", "Run the Simulator");
     const simulator_run = b.addRunArtifact(simulator);
-    simulator_run.addPassthruArgs();
+    for (b.args orelse &.{}) |arg| simulator_run.addArg(arg);
     simulator_run_step.dependOn(&simulator_run.step);
 
     const assembler_run_step = b.step("assemble", "Run the Assembler");
     const assembler_run = b.addRunArtifact(assembler_exe);
-    assembler_run.addPassthruArgs();
+    for (b.args orelse &.{}) |arg| assembler_run.addArg(arg);
     assembler_run_step.dependOn(&assembler_run.step);
 
     const simulator_test = b.addTest(.{
