@@ -58,7 +58,9 @@ pub fn parseProgram(prog_reader: *std.Io.Reader, prog_writer: *std.Io.Writer) Pa
             else => l,
         };
         const instruction = try parseInstruction(trimmed);
-        try prog_writer.writeAll(&@as([4]u8, @bitCast(instruction)));
+        var bytes: [4]u8 = undefined;
+        std.mem.writeInt(u32, &bytes, instruction.raw, .little);
+        try prog_writer.writeAll(&bytes);
         try prog_writer.flush();
     } else return;
 }
