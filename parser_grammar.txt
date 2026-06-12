@@ -1,21 +1,30 @@
-Program         := Line*
-Line            := WS* LabelDef? WS* Instruction? WS* Comment? NewLine
-WS              := ' ' | '\t'
-LabelDef        := Identifier WS* ':'
-Identifier      := [a-zA-Z_] [a-zA-Z0-9_]*
-Instruction     := Mnemonic WS* Operands?
-Mnemonic        := Name
-Name            := [a-z]+
-Operands        := Operand (',' Operand)*
-Operand         := Register | Memory | Immediate | LabelRef
-Register        := RegisterLiteral | (Name ([0-9] | 1[0-1])?)
-RegisterLiteral := 'x' (3[0-1] | [1-2][0-9] | [0-9])
-Memory          := Immediate '(' Register ')'
-Immediate       := '-'? (Hex | Binary | Decimal)
-Hex             := '0x' [0-9a-fA-F]+
-Binary          := '0b' [0-1]+
-Decimal         := [0-9]+
-LabelRef        := Identifier
-Comment         := CommentStart + (!NewLine .)*
-CommentStart    := '#'
-NewLine         := '\n' | '\r\n'
+program         := line* final_line? EOF
+line            := label_def? instruction? NEWLINE
+final_line      := label_def? instruction
+
+label_def       := NAME COLON
+
+instruction     := NAME operands?
+operands        := operand (COMMA operand)*
+
+operand         := memory
+                 | immediate
+                 | name_operand
+
+memory          := immediate? LEFT_PAREN NAME RIGHT_PAREN
+immediate       := MINUS? NUMBER
+name_operand    := NAME
+
+EOF             := !.
+NEWLINE         := '\n' | '\r\n'
+
+NAME            := [a-zA-Z_] [a-zA-Z0-9_]*
+NUMBER          := '0x' [0-9a-fA-F]+
+                 | '0b' [01]+
+                 | [0-9]+
+
+COMMA           := ','
+COLON           := ':'
+MINUS           := '-'
+LEFT_PAREN      := '('
+RIGHT_PAREN     := ')'
