@@ -66,7 +66,7 @@ pub const Machine = struct {
     fn handle(self: *Self, instr: Instruction) !void {
         switch (instr) {
             .rtype => |r| switch (r.cmd) {
-                .add => self.writeRegister(r.rd, self.readRegister(r.rs2) + self.readRegister(r.rs2)),
+                .add => self.writeRegister(r.rd, self.readRegister(r.rs1) + self.readRegister(r.rs2)),
                 .sub => self.writeRegister(r.rd, self.readRegister(r.rs1) - self.readRegister(r.rs2)),
                 .@"or" => self.writeRegister(r.rd, self.readRegister(r.rs1) | self.readRegister(r.rs2)),
                 .@"and" => self.writeRegister(r.rd, self.readRegister(r.rs1) & self.readRegister(r.rs2)),
