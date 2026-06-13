@@ -12,12 +12,13 @@ pos: usize,
 line: u32,
 col: u32,
 done: bool = false,
+next_token: ?Token = null,
 
 pub const Token = union(enum) {
     eof,
     newline,
     name: []const u8,
-    number: u32,
+    number: i32,
     comma,
     colon,
     minus,
@@ -93,6 +94,12 @@ fn isSpecial(c: u8) bool {
     return false;
 }
 
+pub fn peekToken(self: *Self) !?Token {
+    if (self.next_token) |tok| return tok;
+    self.next_token = try self.next();
+    return self.next_token;
+}
+
 pub fn next(self: *Self) !?Token {
     if (self.done) return null;
     const token = try self.nextInternal();
@@ -101,6 +108,11 @@ pub fn next(self: *Self) !?Token {
 }
 
 fn nextInternal(self: *Self) !Token {
+    if (self.next_token) |tok| {
+        self.next_token = null;
+        return tok;
+    }
+
     var c = self.peek() orelse return .eof;
 
     // Discard whitespace
@@ -135,7 +147,7 @@ fn lexChar(self: *Self) Token {
 
 fn lexNumber(self: *Self) !Token {
     const slice = self.nameOrNumber();
-    return .{ .number = std.fmt.parseInt(u32, slice, 0) catch {
+    return .{ .number = std.fmt.parseInt(i32, slice, 0) catch {
         return error.IllegalCharacterInNumber;
     } };
 }
