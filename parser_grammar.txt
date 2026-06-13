@@ -5,7 +5,7 @@ final_line      := label_def? instruction
 label_def       := NAME COLON
 
 instruction     := NAME operands?
-operands        := operand (COMMA operand)*
+operands        := name_operand (COMMA operand)*
 
 operand         := memory
                  | immediate
