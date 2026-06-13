@@ -145,9 +145,10 @@ fn parseOperand(self: *Self) !Operand {
 }
 
 fn parseMemory(self: *Self, immediate: Immediate) !Operand {
-    // We only call this if we know .next() will return
+    // We only call this function if we know .next() will return
     // an l_paren token.
-    _ = self.tokenizer.next() catch {};
+    const tok = (self.tokenizer.next() catch unreachable) orelse unreachable;
+    std.debug.assert(tok == .l_paren);
     var operand: Operand = try self.parseMemoryNoImmediate();
     operand.memory.immediate = immediate;
     return operand;
