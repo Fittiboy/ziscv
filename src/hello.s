@@ -19,7 +19,7 @@ prep:
     addi x18, zero, 33
 
 memory_writes:
-    sw x2, 0(x1)
+    sw x2, (x1)
     sw x3, 4(x1)
     sw x4, 8(x1)
     sw x5, 12(x1)

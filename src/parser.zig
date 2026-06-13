@@ -139,6 +139,7 @@ fn parseOperand(self: *Self) !Operand {
         },
         // Handling register and label_ref
         .name => |str| return parseRegisterOrLabelRef(str),
+        .l_paren => return self.parseMemoryNoImmediate(),
         else => return error.InvalidToken,
     }
 }
@@ -147,6 +148,12 @@ fn parseMemory(self: *Self, immediate: Immediate) !Operand {
     // We only call this if we know .next() will return
     // an l_paren token.
     _ = self.tokenizer.next() catch {};
+    var operand: Operand = try self.parseMemoryNoImmediate();
+    operand.memory.immediate = immediate;
+    return operand;
+}
+
+fn parseMemoryNoImmediate(self: *Self) !Operand {
     const name = try self.tokenizer.next() orelse return error.MissingToken;
     if (name != .name) return error.InvalidToken;
     const reg = switch (try parseRegisterOrLabelRef(name.name)) {
@@ -158,7 +165,7 @@ fn parseMemory(self: *Self, immediate: Immediate) !Operand {
     } else return error.MissingToken;
     return .{
         .memory = .{
-            .immediate = immediate,
+            .immediate = null,
             .register = reg,
         },
     };
@@ -214,7 +221,11 @@ pub const Operand = union(enum) {
         switch (self) {
             .register => |reg| try writer.print("x{d}", .{reg}),
             .memory => |memory| {
-                try writer.print("{d}(x{d})", .{ memory.immediate, memory.register });
+                if (memory.immediate) |imm| {
+                    try writer.print("{d}(x{d})", .{ imm, memory.register });
+                } else {
+                    try writer.print("(x{d})", .{memory.register});
+                }
             },
             .immediate => |imm| try writer.print("{d}", .{imm}),
             .label_ref => |label| try writer.writeAll(label),
@@ -222,7 +233,7 @@ pub const Operand = union(enum) {
     }
 };
 pub const Memory = struct {
-    immediate: Immediate,
+    immediate: ?Immediate,
     register: u5,
 };
 pub const Immediate = i32;
