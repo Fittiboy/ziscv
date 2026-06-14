@@ -59,12 +59,17 @@ fn validateInstructions(
     var validated_program: ValidatedProgram = .empty;
     errdefer validated_program.deinit(gpa);
 
+    var label_map: std.StringHashMapUnmanaged(void) = .empty;
+    defer label_map.deinit(gpa);
+
     for (parsed_program.items) |unit| switch (unit) {
         .instruction => |instruction| {
             const validated_instruction = try validateInstruction(instruction);
             try validated_program.program.append(gpa, .{ .instruction = validated_instruction });
         },
         .label_def => |label| {
+            const entry = try label_map.getOrPut(gpa, label);
+            if (entry.found_existing) return error.DuplicateLabelDefinition;
             try validated_program.program.append(gpa, .{ .label_def = label });
         },
     };
@@ -160,6 +165,7 @@ fn validateBType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
 
 fn validateImmediate(comptime T: type, imm: Parser.Immediate) !T {
     if (imm > std.math.maxInt(T)) return error.ImmediateTooLarge;
+    if (imm < std.math.minInt(T)) return error.ImmediateTooSmall;
     return @truncate(imm);
 }
 
