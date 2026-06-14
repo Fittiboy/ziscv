@@ -1,5 +1,5 @@
 prep:
-    addi x1, zero, data
+    addi x1, zero, 144
     addi x2, zero, 72
     addi x3, zero, 101
     addi x4, zero, 108
