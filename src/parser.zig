@@ -192,7 +192,8 @@ pub const Instruction = struct {
     operands: [3]Operand = undefined,
     num_operands: u2 = 0,
 
-    pub fn operandsSlice(self: Instruction) []const Operand {
+    pub fn operandsSlice(self: *const Instruction) []const Operand {
+        std.debug.assert(self.num_operands <= self.operands.len);
         return self.operands[0..self.num_operands];
     }
 
@@ -203,8 +204,8 @@ pub const Instruction = struct {
         try writer.writeAll(self.mnemonic);
         if (self.num_operands >= 1) try writer.print(" {f}", .{self.operands[0]});
         if (self.num_operands > 1) {
-            for (1..self.num_operands) |i| {
-                try writer.print(", {f}", .{self.operands[i]});
+            for (self.operandsSlice()[1..]) |operand| {
+                try writer.print(", {f}", .{operand});
             }
         }
     }
