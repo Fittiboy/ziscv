@@ -37,6 +37,8 @@ pub fn init(program_buffer: []const u8) Self {
 /// discarded. Labels are now simply indices into a numerical symbol table.
 /// In case of an error, it might be useful to keep the buffer around to
 /// investigate via diagnostics.
+/// In the case of errors that happen after tokenization and parsing, the
+/// diagnostics info is stale. This case is not currently handled.
 pub fn parseAndResolve(self: *Self, gpa: mem.Allocator) !ResolvedProgram {
     var parser: Parser = .init(self.program_buffer);
     errdefer self.diagnostics = .{
@@ -79,15 +81,23 @@ fn resolveInstructions(
         },
     };
 
+    var current_address: i33 = 0;
+
     for (resolved_program.program.items) |*instruction| switch (instruction.*) {
         .btype => |*b| {
             std.debug.assert(b.label == .unresolved);
             const resolved_address: u32 = symbol_map.get(b.label.unresolved) orelse {
                 return error.UndefinedLabelReferenced;
             };
-            b.label = .{ .resolved = resolved_address };
+            const raw_offset: i33 = @as(i33, @intCast(resolved_address)) - current_address;
+            if (raw_offset < std.math.minInt(i13) or raw_offset > std.math.maxInt(i32)) {
+                return error.ExceededBranchDistance;
+            }
+            const offset: i13 = @intCast(raw_offset);
+            b.label = .{ .resolved = offset };
+            current_address += 4;
         },
-        else => continue,
+        else => current_address += 4,
     };
 
     return resolved_program;
@@ -285,7 +295,7 @@ pub const BType = struct {
     rs2: u5,
     label: union(enum) {
         unresolved: []const u8,
-        resolved: u32,
+        resolved: i13,
     },
 
     pub fn format(
