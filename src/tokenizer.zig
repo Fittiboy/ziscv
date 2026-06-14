@@ -1,5 +1,6 @@
 const std = @import("std");
 const meta = std.meta;
+const testing = std.testing;
 const Io = std.Io;
 
 const Self = @This();
@@ -141,6 +142,8 @@ fn nextInternal(self: *Self) !Token {
     }
 }
 
+/// Calling this function when the next character is not
+/// one of ",:-()" invokes safety-checked illegal behavior.
 fn lexChar(self: *Self) Token {
     return Token.fromChar(self.consumeNoEof());
 }
@@ -187,8 +190,6 @@ pub fn fatal(self: Self, comptime msg: []const u8) noreturn {
 //
 //
 //
-
-const testing = std.testing;
 
 test "small smoke test" {
     const buffer =
