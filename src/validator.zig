@@ -128,18 +128,11 @@ fn validateIType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
 }
 
 fn validateLoad(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instruction {
-    if (instruction.num_operands != 2) return error.WrongNumberOfOperands;
-
-    const operands = instruction.operandsSlice();
-    if (operands[0] != .register) return error.IncorrectOperandType;
-    if (operands[1] != .memory) return error.IncorrectOperandType;
-    const raw_memory = operands[1].memory;
-    const validated_immediate = try validateImmediate(i12, raw_memory.immediate orelse 0);
-
+    const raw_memory, const validated_immediate = try validateLoadOrStore(instruction);
     return .{
         .itype = .{
             .mnemonic = mnemonic,
-            .rd = operands[0].register,
+            .rd = instruction.operandsSlice()[0].register,
             .rs1 = raw_memory.register,
             .imm = validated_immediate,
         },
@@ -147,6 +140,18 @@ fn validateLoad(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructio
 }
 
 fn validateSType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instruction {
+    const raw_memory, const validated_immediate = try validateLoadOrStore(instruction);
+    return .{
+        .stype = .{
+            .mnemonic = mnemonic,
+            .rs2 = instruction.operandsSlice()[0].register,
+            .rs1 = raw_memory.register,
+            .imm = validated_immediate,
+        },
+    };
+}
+
+fn validateLoadOrStore(instruction: Parser.Instruction) !struct { Parser.Memory, i12 } {
     if (instruction.num_operands != 2) return error.WrongNumberOfOperands;
 
     const operands = instruction.operandsSlice();
@@ -154,15 +159,7 @@ fn validateSType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
     if (operands[1] != .memory) return error.IncorrectOperandType;
     const raw_memory = operands[1].memory;
     const validated_immediate = try validateImmediate(i12, raw_memory.immediate orelse 0);
-
-    return .{
-        .stype = .{
-            .mnemonic = mnemonic,
-            .rs2 = operands[0].register,
-            .rs1 = raw_memory.register,
-            .imm = validated_immediate,
-        },
-    };
+    return .{ raw_memory, validated_immediate };
 }
 
 fn validateBType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instruction {
