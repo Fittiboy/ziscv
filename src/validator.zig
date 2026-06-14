@@ -14,8 +14,8 @@ pub fn main(proc_init: std.process.Init) !void {
     const file_buf = try reader.allocRemaining(gpa, .unlimited);
     defer gpa.free(file_buf);
 
-    var resolver: Self = .init(file_buf);
-    var program = try resolver.parseAndResolve(gpa);
+    var validator: Self = .init(file_buf);
+    var program = try validator.parseAndValidate(gpa);
     defer program.deinit(gpa);
 
     for (program.program.items) |instruction| {
@@ -32,14 +32,14 @@ pub fn init(program_buffer: []const u8) Self {
     return .{ .program_buffer = program_buffer };
 }
 
-/// After parsing and resolving, the underlying buffer is no longer required,
-/// as the instructions are fully within the type system, and slices are
-/// discarded. Labels are now simply indices into a numerical symbol table.
+/// After parsing and validating, instructions using labels still hold these
+/// in the form of slices over the original buffer, which needs to outlive them.
+/// The same is true for label definitions.
 /// In case of an error, it might be useful to keep the buffer around to
 /// investigate via diagnostics.
 /// In the case of errors that happen after tokenization and parsing, the
 /// diagnostics info is stale. This case is not currently handled.
-pub fn parseAndResolve(self: *Self, gpa: mem.Allocator) !ResolvedProgram {
+pub fn parseAndValidate(self: *Self, gpa: mem.Allocator) !ValidatedProgram {
     var parser: Parser = .init(self.program_buffer);
     errdefer self.diagnostics = .{
         .line = parser.diagnostics.line,
@@ -49,58 +49,26 @@ pub fn parseAndResolve(self: *Self, gpa: mem.Allocator) !ResolvedProgram {
     var parsed_program = try parser.parseProgram(gpa);
     defer parsed_program.deinit(gpa);
 
-    var symbol_map: SymbolMap = .init(gpa);
-    defer symbol_map.deinit();
-
-    return resolveInstructions(gpa, &parsed_program, &symbol_map);
+    return validateInstructions(gpa, &parsed_program);
 }
 
-pub const SymbolMap = std.StringHashMap(u32);
-
-fn resolveInstructions(
+fn validateInstructions(
     gpa: mem.Allocator,
     parsed_program: *Parser.Program,
-    symbol_map: *SymbolMap,
-) !ResolvedProgram {
-    var resolved_program: ResolvedProgram = .empty;
-    errdefer resolved_program.deinit(gpa);
-
-    var next_address: u32 = 0;
+) !ValidatedProgram {
+    var validated_program: ValidatedProgram = .empty;
+    errdefer validated_program.deinit(gpa);
 
     for (parsed_program.items) |unit| switch (unit) {
         .instruction => |instruction| {
             const validated_instruction = try validateInstruction(instruction);
-            try resolved_program.program.append(gpa, validated_instruction);
-
-            next_address += 4;
+            try validated_program.program.append(gpa, .{ .instruction = validated_instruction });
         },
         .label_def => |label| {
-            const entry = try symbol_map.getOrPut(label);
-            if (entry.found_existing) return error.DuplicateLabelDefinition;
-            entry.value_ptr.* = next_address;
+            try validated_program.program.append(gpa, .{ .label_def = label });
         },
     };
-
-    var current_address: i33 = 0;
-
-    for (resolved_program.program.items) |*instruction| switch (instruction.*) {
-        .btype => |*b| {
-            std.debug.assert(b.label == .unresolved);
-            const resolved_address: u32 = symbol_map.get(b.label.unresolved) orelse {
-                return error.UndefinedLabelReferenced;
-            };
-            const raw_offset: i33 = @as(i33, @intCast(resolved_address)) - current_address;
-            if (raw_offset < std.math.minInt(i13) or raw_offset > std.math.maxInt(i32)) {
-                return error.ExceededBranchDistance;
-            }
-            const offset: i13 = @intCast(raw_offset);
-            b.label = .{ .resolved = offset };
-            current_address += 4;
-        },
-        else => current_address += 4,
-    };
-
-    return resolved_program;
+    return validated_program;
 }
 
 fn validateInstruction(instruction: Parser.Instruction) !Instruction {
@@ -185,9 +153,7 @@ fn validateBType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
             .mnemonic = mnemonic,
             .rs1 = operands[0].register,
             .rs2 = operands[1].register,
-            .label = .{
-                .unresolved = operands[2].label_ref,
-            },
+            .label = operands[2].label_ref,
         },
     };
 }
@@ -197,14 +163,29 @@ fn validateImmediate(comptime T: type, imm: Parser.Immediate) !T {
     return @truncate(imm);
 }
 
-pub const ResolvedProgram = struct {
-    program: std.ArrayList(Instruction),
+pub const ValidatedProgram = struct {
+    program: std.ArrayList(Unit),
 
     pub const empty: @This() = .{ .program = .empty };
 
     pub fn deinit(self: *@This(), gpa: mem.Allocator) void {
         self.program.deinit(gpa);
         self.* = undefined;
+    }
+};
+
+pub const Unit = union(enum) {
+    instruction: Instruction,
+    label_def: []const u8,
+
+    pub fn format(
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        switch (self) {
+            .instruction => |instruction| try instruction.format(writer),
+            .label_def => |label| try writer.print("{s}:", .{label}),
+        }
     }
 };
 
@@ -293,29 +274,18 @@ pub const BType = struct {
     mnemonic: Mnemonic,
     rs1: u5,
     rs2: u5,
-    label: union(enum) {
-        unresolved: []const u8,
-        resolved: i13,
-    },
+    label: []const u8,
 
     pub fn format(
         self: @This(),
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        switch (self.label) {
-            .unresolved => |str| try writer.print("{s} x{d}, x{d}, {s}", .{
-                @tagName(self.mnemonic),
-                self.rs1,
-                self.rs2,
-                str,
-            }),
-            .resolved => |imm| try writer.print("{s} x{d}, x{d}, {d}", .{
-                @tagName(self.mnemonic),
-                self.rs1,
-                self.rs2,
-                imm,
-            }),
-        }
+        try writer.print("{s} x{d}, x{d}, {s}", .{
+            @tagName(self.mnemonic),
+            self.rs1,
+            self.rs2,
+            self.label,
+        });
     }
 };
 pub const Memory = struct {
