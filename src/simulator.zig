@@ -64,23 +64,22 @@ pub const Machine = struct {
     }
 
     fn handle(self: *Self, instr: Instruction) !void {
-        // std.debug.print("{any}\n", .{instr});
         switch (instr) {
             .rtype => |r| switch (r.cmd) {
-                .add => self.writeRegister(r.rd, r.rs1 + r.rs2),
-                .sub => self.writeRegister(r.rd, r.rs1 - r.rs2),
-                .@"or" => self.writeRegister(r.rd, r.rs1 | r.rs2),
-                .@"and" => self.writeRegister(r.rd, r.rs1 & r.rs2),
-                .slt => self.writeRegister(r.rd, if (r.rs1 < r.rs2) 1 else 0),
+                .add => self.writeRegister(r.rd, self.readRegister(r.rs1) + self.readRegister(r.rs2)),
+                .sub => self.writeRegister(r.rd, self.readRegister(r.rs1) - self.readRegister(r.rs2)),
+                .@"or" => self.writeRegister(r.rd, self.readRegister(r.rs1) | self.readRegister(r.rs2)),
+                .@"and" => self.writeRegister(r.rd, self.readRegister(r.rs1) & self.readRegister(r.rs2)),
+                .slt => self.writeRegister(r.rd, if (self.readRegister(r.rs1) < self.readRegister(r.rs2)) 1 else 0),
                 else => unreachable,
             },
             .itype => |i| switch (i.cmd) {
                 .lw => {
                     const addr = i.rs1 + i.imm12;
                     if (addr < 0) return error.InvalidAddress;
-                    self.register_bank[i.rd] = self.fetchWord(@intCast(addr));
+                    self.writeRegister(i.rd, self.fetchWord(@intCast(addr)));
                 },
-                .addi => self.register_bank[i.rd] = self.register_bank[i.rs1] + i.imm12,
+                .addi => self.writeRegister(i.rd, self.readRegister(i.rs1) + i.imm12),
                 else => unreachable,
             },
             .stype => |s| {
@@ -99,6 +98,10 @@ pub const Machine = struct {
         }
     }
 
+    fn readRegister(self: Self, reg: u5) i32 {
+        return self.register_bank[reg];
+    }
+
     fn writeRegister(self: *Self, rd: u5, word: i32) void {
         if (rd == 0) return;
         self.register_bank[rd] = word;
@@ -106,7 +109,7 @@ pub const Machine = struct {
 
     fn storeWord(self: *Self, word: i32, addr: u32) !void {
         if (addr <= self.prog_len) return error.InstructionOverwrite;
-        if (addr >= self.memory.len) return error.InvalidAddress;
+        if (addr >= self.memory.len - 3) return error.InvalidAddress;
         const as_bytes: [4]u8 = @bitCast(word);
         @memcpy(self.memory[addr .. addr + 4], &as_bytes);
     }
