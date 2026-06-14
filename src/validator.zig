@@ -82,7 +82,8 @@ fn validateInstruction(instruction: Parser.Instruction) !Instruction {
     };
     return switch (mnemonic) {
         .add, .sub, .@"or", .@"and", .slt => validateRType(mnemonic, instruction),
-        .addi, .lw => validateIType(mnemonic, instruction),
+        .addi => validateIType(mnemonic, instruction),
+        .lw => validateLoad(mnemonic, instruction),
         .sw => validateSType(mnemonic, instruction),
         .beq => validateBType(mnemonic, instruction),
     };
@@ -121,6 +122,25 @@ fn validateIType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
             .mnemonic = mnemonic,
             .rd = operands[0].register,
             .rs1 = operands[1].register,
+            .imm = validated_immediate,
+        },
+    };
+}
+
+fn validateLoad(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instruction {
+    if (instruction.num_operands != 2) return error.WrongNumberOfOperands;
+
+    const operands = instruction.operandsSlice();
+    if (operands[0] != .register) return error.IncorrectOperandType;
+    if (operands[1] != .memory) return error.IncorrectOperandType;
+    const raw_memory = operands[1].memory;
+    const validated_immediate = try validateImmediate(i12, raw_memory.immediate orelse 0);
+
+    return .{
+        .itype = .{
+            .mnemonic = mnemonic,
+            .rd = operands[0].register,
+            .rs1 = raw_memory.register,
             .imm = validated_immediate,
         },
     };
@@ -250,12 +270,20 @@ pub const IType = struct {
         self: @This(),
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
-        try writer.print("{s} x{d}, x{d}, {d}", .{
-            @tagName(self.mnemonic),
-            self.rd,
-            self.rs1,
-            self.imm,
-        });
+        switch (self.mnemonic) {
+            .lw => try writer.print("{s} x{d}, {d}(x{d})", .{
+                @tagName(self.mnemonic),
+                self.rd,
+                self.imm,
+                self.rs1,
+            }),
+            else => try writer.print("{s} x{d}, x{d}, {d}", .{
+                @tagName(self.mnemonic),
+                self.rd,
+                self.rs1,
+                self.imm,
+            }),
+        }
     }
 };
 pub const SType = struct {
