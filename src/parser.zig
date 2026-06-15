@@ -77,18 +77,18 @@ fn parseRegisterOrLabelRef(name: []const u8) !Operand {
 
 fn parseOperand(self: *Self) !Operand {
     const tok = try self.tokenizer.next() orelse return error.MissingOperandToken;
-    var number_multiplier: i32 = 1;
+    var sign_multiplier: i32 = 1;
     s: switch (tok) {
         // Handling immediate and memory
         .minus => {
-            number_multiplier = -1;
+            sign_multiplier = -1;
             const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
             if (next_tok != .number) return error.MisplacedToken;
             continue :s next_tok;
         },
         // Also handling immediate and memory
         .number => |num| {
-            const immediate: Immediate = num * number_multiplier;
+            const immediate: Immediate = num * sign_multiplier;
             const next_tok = try self.tokenizer.peekToken();
             if (next_tok) |next_inner| if (next_inner == .l_paren) {
                 return self.parseMemory(immediate);
