@@ -198,7 +198,7 @@ pub const Instruction = union(enum) {
         }
     }
 };
-pub const RType = struct {
+const RType = struct {
     mnemonic: Mnemonic,
     rd: u5,
     rs1: u5,
@@ -216,7 +216,7 @@ pub const RType = struct {
         });
     }
 };
-pub const IType = struct {
+const IType = struct {
     mnemonic: Mnemonic,
     rd: u5,
     rs1: u5,
@@ -242,7 +242,7 @@ pub const IType = struct {
         }
     }
 };
-pub const SType = struct {
+const SType = struct {
     mnemonic: Mnemonic,
     rs2: u5,
     rs1: u5,
@@ -260,7 +260,7 @@ pub const SType = struct {
         });
     }
 };
-pub const BType = struct {
+const BType = struct {
     mnemonic: Mnemonic,
     rs1: u5,
     rs2: u5,
@@ -278,7 +278,7 @@ pub const BType = struct {
         });
     }
 };
-pub const Memory = struct {
+const Memory = struct {
     immediate: i12,
     register: u5,
 };
