@@ -24,14 +24,12 @@ pub fn next(self: *Self) !?Unit {
     }
 
     while (try self.tokenizer.next()) |tok| {
-        switch (tok) {
-            .eof => break,
+        return switch (tok) {
+            .eof => null,
             .newline => continue,
-            .comma, .colon, .minus, .l_paren, .r_paren, .number => return error.MisplacedToken,
-            .name => |identifier| {
-                return try self.parseIdentifier(identifier);
-            },
-        }
+            .comma, .colon, .minus, .l_paren, .r_paren, .number => error.MisplacedToken,
+            .name => |identifier| try self.parseIdentifier(identifier),
+        };
     }
 
     return null;
