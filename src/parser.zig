@@ -43,48 +43,6 @@ fn parseIdentifier(self: *Self, identifier: []const u8) !Unit {
     };
 }
 
-/// If this function returns an error, you may inspect the `diagnostics` field for
-/// information about where it occured. It will point you to the end of the offending
-/// token if the error name contains "Token", and to the offending character if the
-/// error name contains "Character".
-/// Helpfulness of this diagnostic information will be highly limited for errors originating
-/// at allocation sites.
-pub fn parseProgram(self: *Self, gpa: mem.Allocator) !Program {
-    var program: Program = .empty;
-    errdefer {
-        program.deinit(gpa);
-        self.diagnostics = .{
-            .line = self.tokenizer.line,
-            .col = self.tokenizer.col,
-        };
-    }
-
-    while (try self.tokenizer.next()) |tok| {
-        switch (tok) {
-            .eof => break,
-            .newline => continue,
-            .comma, .colon, .minus, .l_paren, .r_paren, .number => return error.MisplacedToken,
-            .name => |identifier| {
-                const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
-                switch (next_tok) {
-                    .colon => try program.append(gpa, .{ .label_def = identifier }),
-                    .name => |first_operand| {
-                        const instruction = try self.parseInstruction(identifier, first_operand);
-                        try program.append(gpa, .{ .instruction = instruction });
-                    },
-                    .eof, .newline => {
-                        const instruction: Instruction = .{ .mnemonic = identifier };
-                        try program.append(gpa, .{ .instruction = instruction });
-                    },
-                    else => return error.MisplacedToken,
-                }
-            },
-        }
-    }
-
-    return program;
-}
-
 fn parseInstruction(
     self: *Self,
     identifier: []const u8,
