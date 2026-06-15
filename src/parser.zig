@@ -154,13 +154,13 @@ pub const Instruction = struct {
         return self.operands[0..self.num_operands];
     }
 
-    pub fn appendOperand(self: *Instruction, operand: Operand) !void {
+    fn appendOperand(self: *Instruction, operand: Operand) !void {
         if (self.num_operands >= 3) return error.TooManyOperandTokens;
         self.operands[self.num_operands] = operand;
         self.num_operands += 1;
     }
 
-    pub fn format(
+    fn format(
         self: @This(),
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
@@ -173,13 +173,13 @@ pub const Instruction = struct {
         }
     }
 };
-pub const Operand = union(enum) {
+const Operand = union(enum) {
     register: u5,
     memory: Memory,
     immediate: Immediate,
     label_ref: []const u8,
 
-    pub fn format(
+    fn format(
         self: @This(),
         writer: *std.Io.Writer,
     ) std.Io.Writer.Error!void {
@@ -203,7 +203,7 @@ pub const Memory = struct {
 };
 pub const Immediate = i32;
 
-pub const reg_aliases: StringMap = .initComptime(.{
+const reg_aliases: StringMap = .initComptime(.{
     .{ "zero", 0 }, .{ "ra", 1 },  .{ "sp", 2 },  .{ "gp", 3 },
     .{ "tp", 4 },   .{ "t0", 5 },  .{ "t1", 6 },  .{ "t2", 7 },
     .{ "s0", 8 },   .{ "fp", 8 },  .{ "s1", 9 },  .{ "a0", 10 },
