@@ -156,17 +156,6 @@ fn validateImmediate(comptime T: type, imm: Parser.Immediate) !T {
     return @truncate(imm);
 }
 
-pub const ValidatedProgram = struct {
-    program: std.ArrayList(ValidatedUnit),
-
-    pub const empty: @This() = .{ .program = .empty };
-
-    pub fn deinit(self: *@This(), gpa: mem.Allocator) void {
-        self.program.deinit(gpa);
-        self.* = undefined;
-    }
-};
-
 pub const ValidatedUnit = union(enum) {
     instruction: Instruction,
     label_def: []const u8,
