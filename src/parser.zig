@@ -1,31 +1,10 @@
 const std = @import("std");
 const mem = std.mem;
+const testing = std.testing;
 
 const Tokenizer = @import("tokenizer.zig");
 const ArrayList = std.ArrayList;
 const StringMap = std.StaticStringMap(u5);
-
-pub fn main(proc_init: std.process.Init) !void {
-    const io = proc_init.io;
-    const gpa = proc_init.gpa;
-
-    const hello_file = try std.Io.Dir.cwd().openFile(io, "src/hello.s", .{});
-    var file_reader_buf: [1024]u8 = undefined;
-    var file_reader = hello_file.reader(io, &file_reader_buf);
-    const reader = &file_reader.interface;
-
-    const file_buf = try reader.allocRemaining(gpa, .unlimited);
-    defer gpa.free(file_buf);
-
-    var parser = init(file_buf);
-
-    var program = try parser.parseProgram(gpa);
-    defer program.deinit(gpa);
-
-    for (program.items) |unit| {
-        std.debug.print("{f}\n", .{unit});
-    }
-}
 
 const Self = @This();
 
@@ -50,24 +29,28 @@ pub fn next(self: *Self) !?Unit {
             .newline => continue,
             .comma, .colon, .minus, .l_paren, .r_paren, .number => return error.MisplacedToken,
             .name => |identifier| {
-                const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
-                switch (next_tok) {
-                    .colon => return .{ .label_def = identifier },
-                    .name => |first_operand| {
-                        const instruction = try self.parseInstruction(identifier, first_operand);
-                        return .{ .instruction = instruction };
-                    },
-                    .eof, .newline => {
-                        const instruction: Instruction = .{ .mnemonic = identifier };
-                        return .{ .instruction = instruction };
-                    },
-                    else => return error.MisplacedToken,
-                }
+                return try self.parseIdentifier(identifier);
             },
         }
     }
 
     return null;
+}
+
+fn parseIdentifier(self: *Self, identifier: []const u8) !Unit {
+    const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
+    switch (next_tok) {
+        .colon => return .{ .label_def = identifier },
+        .name => |first_operand| {
+            const instruction = try self.parseInstruction(identifier, first_operand);
+            return .{ .instruction = instruction };
+        },
+        .eof, .newline => {
+            const instruction: Instruction = .{ .mnemonic = identifier };
+            return .{ .instruction = instruction };
+        },
+        else => return error.MisplacedToken,
+    }
 }
 
 /// If this function returns an error, you may inspect the `diagnostics` field for
@@ -129,7 +112,7 @@ fn parseInstruction(
                 instruction.operands[instruction.num_operands] = operand;
                 instruction.num_operands += 1;
             },
-            else => return error.MisplacedToken,
+            else => return error.MissingToken,
         }
     }
 
@@ -159,7 +142,7 @@ fn parseOperand(self: *Self) !Operand {
         .minus => {
             number_multiplier = -1;
             const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
-            if (next_tok != .number) return error.InvalidToken;
+            if (next_tok != .number) return error.MisplacedToken;
             continue :s next_tok;
         },
         // Also handling immediate and memory
@@ -174,7 +157,7 @@ fn parseOperand(self: *Self) !Operand {
         // Handling register and label_ref
         .name => |str| return parseRegisterOrLabelRef(str),
         .l_paren => return self.parseMemoryNoImmediate(),
-        else => return error.InvalidToken,
+        else => return error.MisplacedToken,
     }
 }
 
@@ -190,13 +173,13 @@ fn parseMemory(self: *Self, immediate: Immediate) !Operand {
 
 fn parseMemoryNoImmediate(self: *Self) !Operand {
     const name = try self.tokenizer.next() orelse return error.MissingToken;
-    if (name != .name) return error.InvalidToken;
+    if (name != .name) return error.MisplacedToken;
     const reg = switch (try parseRegisterOrLabelRef(name.name)) {
         .register => |reg| reg,
-        else => return error.InvalidToken,
+        else => return error.MisplacedToken,
     };
     if (try self.tokenizer.next()) |r_paren| {
-        if (r_paren != .r_paren) return error.InvalidToken;
+        if (r_paren != .r_paren) return error.MisplacedToken;
     } else return error.MissingToken;
     return .{
         .memory = .{
@@ -341,5 +324,28 @@ test "small Parser smoke test" {
 
     var parser: Self = .init(program_buf);
     var i: usize = 0;
-    while (try parser.next()) |unit| : (i += 1) try std.testing.expectEqualDeep(expecteds[i], unit);
+    while (try parser.next()) |unit| : (i += 1) try testing.expectEqualDeep(expecteds[i], unit);
+}
+
+test "various invalid programs cause Parser errors" {
+    const programs: [5][]const u8 = .{
+        "ad) x1, x2, x3",
+        "add x1 x2, x3",
+        "sw x1, -10(x2",
+        "(",
+        "add x1, x2, x3, x4",
+    };
+
+    const expecteds: [5]anyerror = .{
+        error.MisplacedToken,
+        error.MissingToken,
+        error.MisplacedToken,
+        error.MisplacedToken,
+        error.TooManyOperandTokens,
+    };
+
+    for (programs, expecteds) |program, expected| {
+        var parser: Self = .init(program);
+        try testing.expectError(expected, parser.next());
+    }
 }
