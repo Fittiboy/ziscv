@@ -16,12 +16,10 @@ pub fn init(program_buffer: []const u8) Self {
 }
 
 pub fn next(self: *Self) !?Unit {
-    errdefer {
-        self.diagnostics = .{
-            .line = self.tokenizer.line,
-            .col = self.tokenizer.col,
-        };
-    }
+    errdefer self.diagnostics = .{
+        .line = self.tokenizer.line,
+        .col = self.tokenizer.col,
+    };
 
     while (try self.tokenizer.next()) |tok| {
         return switch (tok) {
@@ -37,18 +35,12 @@ pub fn next(self: *Self) !?Unit {
 
 fn parseIdentifier(self: *Self, identifier: []const u8) !Unit {
     const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
-    switch (next_tok) {
-        .colon => return .{ .label_def = identifier },
-        .name => |first_operand| {
-            const instruction = try self.parseInstruction(identifier, first_operand);
-            return .{ .instruction = instruction };
-        },
-        .eof, .newline => {
-            const instruction: Instruction = .{ .mnemonic = identifier };
-            return .{ .instruction = instruction };
-        },
-        else => return error.MisplacedToken,
-    }
+    return switch (next_tok) {
+        .colon => .{ .label_def = identifier },
+        .name => |first_operand| .{ .instruction = try self.parseInstruction(identifier, first_operand) },
+        .eof, .newline => .{ .instruction = .{ .mnemonic = identifier } },
+        else => error.MisplacedToken,
+    };
 }
 
 /// If this function returns an error, you may inspect the `diagnostics` field for

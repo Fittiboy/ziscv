@@ -129,18 +129,18 @@ fn nextInternal(self: *Self) !Token {
         c = self.peek() orelse return .eof;
     };
 
-    switch (c) {
-        '\n' => {
+    return switch (c) {
+        '\n' => blk: {
             self.toss();
             self.line += 1;
             self.col = 0;
-            return .newline;
+            break :blk .newline;
         },
-        ',', ':', '-', '(', ')' => return self.lexChar(),
-        '0'...'9' => return try self.lexNumber(),
-        'a'...'z', 'A'...'Z', '_' => return try self.lexName(),
-        else => return error.IllegalCharacter,
-    }
+        ',', ':', '-', '(', ')' => self.lexChar(),
+        '0'...'9' => try self.lexNumber(),
+        'a'...'z', 'A'...'Z', '_' => try self.lexName(),
+        else => error.IllegalCharacter,
+    };
 }
 
 /// Calling this function when the next character is not
