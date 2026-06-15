@@ -176,13 +176,6 @@ fn nameOrNumber(self: *Self) []const u8 {
     return self.buffer[start..self.pos];
 }
 
-pub fn fatal(self: Self, comptime msg: []const u8) noreturn {
-    std.process.fatal(
-        "{s}: line: {d}, col: {d}",
-        .{ msg, self.line, self.col },
-    );
-}
-
 //
 //
 //
@@ -191,7 +184,7 @@ pub fn fatal(self: Self, comptime msg: []const u8) noreturn {
 //
 //
 
-test "small smoke test" {
+test "small Tokenizer smoke test" {
     const buffer =
         \\add rp, hero, twelve, 12, -1(hello) # With a comment, too!
         \\   #This one just has a comment!! :)))
@@ -226,4 +219,25 @@ test "small smoke test" {
     while (try tokenizer.next()) |tok| : (i += 1) {
         try testing.expectEqualDeep(expected[i], tok);
     }
+}
+
+test "Tokenizer error on illegal character in general" {
+    const buffer = "add !, x1, x2";
+    var tokenizer: Self = .init(buffer);
+    _ = try tokenizer.next();
+    try std.testing.expectError(error.IllegalCharacter, tokenizer.next());
+}
+
+test "Tokenizer error on illegal character in name" {
+    const buffer = "add hello&there, x1, x2";
+    var tokenizer: Self = .init(buffer);
+    _ = try tokenizer.next();
+    try std.testing.expectError(error.IllegalCharacterInName, tokenizer.next());
+}
+
+test "Tokenizer error on non-numeric string that starts with digit" {
+    const buffer = "add 0x, x1, x2";
+    var tokenizer: Self = .init(buffer);
+    _ = try tokenizer.next();
+    try std.testing.expectError(error.IllegalCharacterInNumber, tokenizer.next());
 }
