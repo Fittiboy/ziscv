@@ -1,79 +1,49 @@
 const std = @import("std");
 const mem = std.mem;
+const testing = std.testing;
+
 const Parser = @import("parser.zig");
-
-pub fn main(proc_init: std.process.Init) !void {
-    const io = proc_init.io;
-    const gpa = proc_init.gpa;
-
-    const hello_file = try std.Io.Dir.cwd().openFile(io, "src/hello.s", .{});
-    var file_reader_buf: [1024]u8 = undefined;
-    var file_reader = hello_file.reader(io, &file_reader_buf);
-    const reader = &file_reader.interface;
-
-    const file_buf = try reader.allocRemaining(gpa, .unlimited);
-    defer gpa.free(file_buf);
-
-    var validator: Self = .init(file_buf);
-    var program = try validator.parseAndValidate(gpa);
-    defer program.deinit(gpa);
-
-    for (program.program.items) |instruction| {
-        std.debug.print("{f}\n", .{instruction});
-    }
-}
 
 const Self = @This();
 
-program_buffer: []const u8,
+parser: Parser,
+label_map: std.StringHashMapUnmanaged(void) = .empty,
 diagnostics: struct { line: usize = 0, col: usize = 0 } = .{},
 
+/// The `Parser` carries a label map for validation, which needs to
+/// be deinitialized after work is done.
 pub fn init(program_buffer: []const u8) Self {
-    return .{ .program_buffer = program_buffer };
+    return .{ .parser = .init(program_buffer) };
 }
 
-/// After parsing and validating, instructions using labels still hold these
-/// in the form of slices over the original buffer, which needs to outlive them.
-/// The same is true for label definitions.
-/// In case of an error, it might be useful to keep the buffer around to
-/// investigate via diagnostics.
-/// In the case of errors that happen after tokenization and parsing, the
-/// diagnostics info is stale. This case is not currently handled.
-pub fn parseAndValidate(self: *Self, gpa: mem.Allocator) !ValidatedProgram {
-    var parser: Parser = .init(self.program_buffer);
+pub fn deinit(self: *Self, gpa: mem.Allocator) void {
+    self.label_map.deinit(gpa);
+    self.* = undefined;
+}
+
+/// The allocator is needed for label map allocations, to keep
+/// track of possibly duplicate label definitions.
+pub fn next(self: *Self, gpa: mem.Allocator) !?ValidatedUnit {
     errdefer self.diagnostics = .{
-        .line = parser.diagnostics.line,
-        .col = parser.diagnostics.col,
+        .line = self.parser.diagnostics.line,
+        .col = self.parser.diagnostics.col,
     };
 
-    var parsed_program = try parser.parseProgram(gpa);
-    defer parsed_program.deinit(gpa);
-
-    return validateInstructions(gpa, &parsed_program);
+    const unit = try self.parser.next() orelse return null;
+    return try self.validateUnit(gpa, unit);
 }
 
-fn validateInstructions(
-    gpa: mem.Allocator,
-    parsed_program: *Parser.Program,
-) !ValidatedProgram {
-    var validated_program: ValidatedProgram = .empty;
-    errdefer validated_program.deinit(gpa);
-
-    var label_map: std.StringHashMapUnmanaged(void) = .empty;
-    defer label_map.deinit(gpa);
-
-    for (parsed_program.items) |unit| switch (unit) {
-        .instruction => |instruction| {
-            const validated_instruction = try validateInstruction(instruction);
-            try validated_program.program.append(gpa, .{ .instruction = validated_instruction });
-        },
-        .label_def => |label| {
-            const entry = try label_map.getOrPut(gpa, label);
-            if (entry.found_existing) return error.DuplicateLabelDefinition;
-            try validated_program.program.append(gpa, .{ .label_def = label });
-        },
+fn validateUnit(self: *Self, gpa: mem.Allocator, unit: Parser.Unit) !ValidatedUnit {
+    return switch (unit) {
+        .instruction => |instruction| .{ .instruction = try validateInstruction(instruction) },
+        .label_def => |label| self.validateLabel(gpa, label),
     };
-    return validated_program;
+}
+
+fn validateLabel(self: *Self, gpa: mem.Allocator, label: []const u8) !ValidatedUnit {
+    const entry = try self.label_map.getOrPut(gpa, label);
+    if (entry.found_existing) return error.DuplicateLabelDefinition;
+    return .{ .label_def = label };
 }
 
 fn validateInstruction(instruction: Parser.Instruction) !Instruction {
@@ -187,7 +157,7 @@ fn validateImmediate(comptime T: type, imm: Parser.Immediate) !T {
 }
 
 pub const ValidatedProgram = struct {
-    program: std.ArrayList(Unit),
+    program: std.ArrayList(ValidatedUnit),
 
     pub const empty: @This() = .{ .program = .empty };
 
@@ -197,7 +167,7 @@ pub const ValidatedProgram = struct {
     }
 };
 
-pub const Unit = union(enum) {
+pub const ValidatedUnit = union(enum) {
     instruction: Instruction,
     label_def: []const u8,
 
@@ -323,3 +293,47 @@ pub const Memory = struct {
     immediate: i12,
     register: u5,
 };
+
+//
+//
+// TESTS
+//
+//
+
+test "small Validator smoke test" {
+    const program =
+        \\addi sp, sp, -16
+        \\sw s0, 12(sp)
+    ;
+
+    const expecteds = [_]ValidatedUnit{
+        .{
+            .instruction = .{
+                .itype = .{
+                    .mnemonic = .addi,
+                    .rd = 2,
+                    .rs1 = 2,
+                    .imm = -16,
+                },
+            },
+        },
+        .{
+            .instruction = .{
+                .stype = .{
+                    .mnemonic = .sw,
+                    .rs2 = 8,
+                    .rs1 = 2,
+                    .imm = 12,
+                },
+            },
+        },
+    };
+
+    const gpa = testing.allocator;
+    var validator: Self = .init(program);
+    defer validator.deinit(gpa);
+    var i: usize = 0;
+    while (try validator.next(gpa)) |unit| : (i += 1) {
+        try testing.expectEqualDeep(expecteds[i], unit);
+    }
+}
