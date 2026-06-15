@@ -130,7 +130,6 @@ fn parseMemoryNoImmediate(self: *Self) !Operand {
     };
 }
 
-pub const Program = ArrayList(Unit);
 pub const Unit = union(enum) {
     label_def: []const u8,
     instruction: Instruction,
