@@ -1,6 +1,7 @@
 const std = @import("std");
 const meta = std.meta;
 const testing = std.testing;
+
 const Io = std.Io;
 
 const Self = @This();
@@ -225,19 +226,19 @@ test "Tokenizer error on illegal character in general" {
     const buffer = "add !, x1, x2";
     var tokenizer: Self = .init(buffer);
     _ = try tokenizer.next();
-    try std.testing.expectError(error.IllegalCharacter, tokenizer.next());
+    try testing.expectError(error.IllegalCharacter, tokenizer.next());
 }
 
 test "Tokenizer error on illegal character in name" {
     const buffer = "add hello&there, x1, x2";
     var tokenizer: Self = .init(buffer);
     _ = try tokenizer.next();
-    try std.testing.expectError(error.IllegalCharacterInName, tokenizer.next());
+    try testing.expectError(error.IllegalCharacterInName, tokenizer.next());
 }
 
 test "Tokenizer error on non-numeric string that starts with digit" {
     const buffer = "add 0x, x1, x2";
     var tokenizer: Self = .init(buffer);
     _ = try tokenizer.next();
-    try std.testing.expectError(error.IllegalCharacterInNumber, tokenizer.next());
+    try testing.expectError(error.IllegalCharacterInNumber, tokenizer.next());
 }
