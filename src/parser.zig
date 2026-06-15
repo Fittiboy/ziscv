@@ -36,6 +36,40 @@ pub fn init(program_buffer: []const u8) Self {
     return .{ .tokenizer = .init(program_buffer) };
 }
 
+pub fn next(self: *Self) !?Unit {
+    errdefer {
+        self.diagnostics = .{
+            .line = self.tokenizer.line,
+            .col = self.tokenizer.col,
+        };
+    }
+
+    while (try self.tokenizer.next()) |tok| {
+        switch (tok) {
+            .eof => break,
+            .newline => continue,
+            .comma, .colon, .minus, .l_paren, .r_paren, .number => return error.MisplacedToken,
+            .name => |identifier| {
+                const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
+                switch (next_tok) {
+                    .colon => return .{ .label_def = identifier },
+                    .name => |first_operand| {
+                        const instruction = try self.parseInstruction(identifier, first_operand);
+                        return .{ .instruction = instruction };
+                    },
+                    .eof, .newline => {
+                        const instruction: Instruction = .{ .mnemonic = identifier };
+                        return .{ .instruction = instruction };
+                    },
+                    else => return error.MisplacedToken,
+                }
+            },
+        }
+    }
+
+    return null;
+}
+
 /// If this function returns an error, you may inspect the `diagnostics` field for
 /// information about where it occured. It will point you to the end of the offending
 /// token if the error name contains "Token", and to the offending character if the
@@ -58,8 +92,8 @@ pub fn parseProgram(self: *Self, gpa: mem.Allocator) !Program {
             .newline => continue,
             .comma, .colon, .minus, .l_paren, .r_paren, .number => return error.MisplacedToken,
             .name => |identifier| {
-                const next = try self.tokenizer.next() orelse return error.MissingToken;
-                switch (next) {
+                const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
+                switch (next_tok) {
                     .colon => try program.append(gpa, .{ .label_def = identifier }),
                     .name => |first_operand| {
                         const instruction = try self.parseInstruction(identifier, first_operand);
@@ -124,15 +158,15 @@ fn parseOperand(self: *Self) !Operand {
         // Handling immediate and memory
         .minus => {
             number_multiplier = -1;
-            const next = try self.tokenizer.next() orelse return error.MissingToken;
-            if (next != .number) return error.InvalidToken;
-            continue :s next;
+            const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
+            if (next_tok != .number) return error.InvalidToken;
+            continue :s next_tok;
         },
         // Also handling immediate and memory
         .number => |num| {
             const immediate: Immediate = num * number_multiplier;
-            const next = try self.tokenizer.peekToken();
-            if (next) |next_tok| if (next_tok == .l_paren) {
+            const next_tok = try self.tokenizer.peekToken();
+            if (next_tok) |next_inner| if (next_inner == .l_paren) {
                 return self.parseMemory(immediate);
             };
             return .{ .immediate = immediate };
@@ -251,3 +285,61 @@ pub const reg_aliases: StringMap = .initComptime(.{
     .{ "s11", 27 }, .{ "t3", 28 }, .{ "t4", 29 }, .{ "t5", 30 },
     .{ "t6", 31 },
 });
+
+//
+//
+// TESTS
+//
+//
+
+test "small Parser smoke test" {
+    const program_buf =
+        \\add x1, x2, label
+        \\word oh, my, 0x100
+        \\label:
+        \\hello there, how, areya
+    ;
+
+    const expecteds: [4]Unit = .{
+        .{
+            .instruction = .{
+                .mnemonic = "add",
+                .operands = [3]Operand{
+                    .{ .register = 1 },
+                    .{ .register = 2 },
+                    .{ .label_ref = "label" },
+                },
+                .num_operands = 3,
+            },
+        },
+        .{
+            .instruction = .{
+                .mnemonic = "word",
+                .operands = [3]Operand{
+                    .{ .label_ref = "oh" },
+                    .{ .label_ref = "my" },
+                    .{ .immediate = 0x100 },
+                },
+                .num_operands = 3,
+            },
+        },
+        .{
+            .label_def = "label",
+        },
+        .{
+            .instruction = .{
+                .mnemonic = "hello",
+                .operands = [3]Operand{
+                    .{ .label_ref = "there" },
+                    .{ .label_ref = "how" },
+                    .{ .label_ref = "areya" },
+                },
+                .num_operands = 3,
+            },
+        },
+    };
+
+    var parser: Self = .init(program_buf);
+    var i: usize = 0;
+    while (try parser.next()) |unit| : (i += 1) try std.testing.expectEqualDeep(expecteds[i], unit);
+}
