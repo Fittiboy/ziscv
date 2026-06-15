@@ -37,7 +37,7 @@ fn parseIdentifier(self: *Self, identifier: []const u8) !Unit {
     const next_tok = try self.tokenizer.next() orelse return error.MissingToken;
     return switch (next_tok) {
         .colon => .{ .label_def = identifier },
-        .name => |first_operand| .{ .instruction = try self.parseInstruction(identifier, first_operand) },
+        .name => |raw_first_operand| .{ .instruction = try self.parseInstruction(identifier, raw_first_operand) },
         .eof, .newline => .{ .instruction = .{ .mnemonic = identifier } },
         else => error.MisplacedToken,
     };
@@ -46,23 +46,16 @@ fn parseIdentifier(self: *Self, identifier: []const u8) !Unit {
 fn parseInstruction(
     self: *Self,
     identifier: []const u8,
-    first_operand: []const u8,
+    raw_first_operand: []const u8,
 ) !Instruction {
     var instruction: Instruction = .{ .mnemonic = identifier };
-    instruction.operands[0] = try parseRegisterOrLabelRef(first_operand);
-    instruction.num_operands += 1;
-    while (try self.tokenizer.next()) |tok| {
-        switch (tok) {
-            .newline, .eof => break,
-            .comma => {
-                if (instruction.num_operands >= 3) return error.TooManyOperandTokens;
-                const operand = try self.parseOperand();
-                instruction.operands[instruction.num_operands] = operand;
-                instruction.num_operands += 1;
-            },
-            else => return error.MissingToken,
-        }
-    }
+
+    try instruction.appendOperand(try parseRegisterOrLabelRef(raw_first_operand));
+    while (try self.tokenizer.next()) |tok| switch (tok) {
+        .newline, .eof => break,
+        .comma => try instruction.appendOperand(try self.parseOperand()),
+        else => return error.MissingToken,
+    };
 
     return instruction;
 }
@@ -160,6 +153,12 @@ pub const Instruction = struct {
     pub fn operandsSlice(self: *const Instruction) []const Operand {
         std.debug.assert(self.num_operands <= self.operands.len);
         return self.operands[0..self.num_operands];
+    }
+
+    pub fn appendOperand(self: *Instruction, operand: Operand) !void {
+        if (self.num_operands >= 3) return error.TooManyOperandTokens;
+        self.operands[self.num_operands] = operand;
+        self.num_operands += 1;
     }
 
     pub fn format(
