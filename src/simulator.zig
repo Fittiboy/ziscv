@@ -57,7 +57,6 @@ pub const Machine = struct {
         self.pc = 0x00000000;
 
         while (self.nextInstruction()) |instruction| {
-            // std.debug.print("Instruction: 0x{X:0>8}\n", .{self.fetchWordUnsigned(self.pc)});
             self.handle(instruction) catch |err| {
                 std.process.fatal("handling 0x{X:0>8}: {s}", .{ self.fetchWordUnsigned(self.pc), @errorName(err) });
             };
@@ -85,13 +84,13 @@ pub const Machine = struct {
                 else => unreachable,
             },
             .stype => |s| {
-                const addr = self.register_bank[s.rs1] + s.offset;
+                const addr = self.readRegister(s.rs1) + s.offset;
                 if (addr < 0) return error.InvalidAddr;
-                const word = self.register_bank[s.rs2];
+                const word = self.readRegister(s.rs2);
                 try self.storeWord(word, @intCast(addr));
             },
             .btype => |b| {
-                if (self.register_bank[b.rs1] == self.register_bank[b.rs2]) {
+                if (self.readRegister(b.rs1) == self.readRegister(b.rs2)) {
                     if (b.offset < 0) {
                         self.pc -= @intCast(-b.offset);
                     } else self.pc += @intCast(b.offset);
