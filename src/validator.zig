@@ -8,7 +8,6 @@ const Self = @This();
 
 parser: Parser,
 label_map: std.StringHashMapUnmanaged(void) = .empty,
-diagnostics: struct { line: usize = 0, col: usize = 0 } = .{},
 
 /// The `Parser` carries a label map for validation, which needs to
 /// be deinitialized after work is done.
@@ -24,11 +23,6 @@ pub fn deinit(self: *Self, gpa: mem.Allocator) void {
 /// The allocator is needed for label map allocations, to keep
 /// track of possibly duplicate label definitions.
 pub fn next(self: *Self, gpa: mem.Allocator) !?ValidatedUnit {
-    errdefer self.diagnostics = .{
-        .line = self.parser.diagnostics.line,
-        .col = self.parser.diagnostics.col,
-    };
-
     const unit = try self.parser.next() orelse return null;
     return try self.validateUnit(gpa, unit);
 }

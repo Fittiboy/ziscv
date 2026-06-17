@@ -9,18 +9,12 @@ const StringMap = std.StaticStringMap(u5);
 const Self = @This();
 
 tokenizer: Tokenizer,
-diagnostics: struct { line: usize = 0, col: usize = 0 } = .{},
 
 pub fn init(program_buffer: []const u8) Self {
     return .{ .tokenizer = .init(program_buffer) };
 }
 
 pub fn next(self: *Self) !?Unit {
-    errdefer self.diagnostics = .{
-        .line = self.tokenizer.line,
-        .col = self.tokenizer.col,
-    };
-
     while (try self.tokenizer.next()) |tok| {
         return switch (tok) {
             .eof => null,
