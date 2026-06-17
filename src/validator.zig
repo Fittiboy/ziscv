@@ -35,6 +35,7 @@ fn validateUnit(self: *Self, gpa: mem.Allocator, unit: Parser.Unit) !ValidatedUn
 }
 
 fn validateLabel(self: *Self, gpa: mem.Allocator, label: []const u8) !ValidatedUnit {
+    if (Parser.reg_aliases.get(label)) |_| return error.IllegalLabelName;
     const entry = try self.label_map.getOrPut(gpa, label);
     if (entry.found_existing) return error.DuplicateLabelDefinition;
     return .{ .label_def = label };
@@ -319,4 +320,13 @@ test "small Validator smoke test" {
     while (try validator.next(gpa)) |unit| : (i += 1) {
         try testing.expectEqualDeep(expecteds[i], unit);
     }
+}
+
+test "register labels not allowed" {
+    const program = "zero:";
+
+    const gpa = testing.allocator;
+    var validator: Self = .init(program);
+    defer validator.deinit(gpa);
+    try testing.expectError(error.IllegalLabelName, validator.next(gpa));
 }
