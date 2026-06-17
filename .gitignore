@@ -1,5 +1,5 @@
 zig-out
 .zig-cache
 debug.bin
-debug.S
+debug.s
 debug_dump.bin

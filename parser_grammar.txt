@@ -1,0 +1,30 @@
+program         := line* final_line? EOF
+line            := label_def? instruction? NEWLINE
+final_line      := label_def? instruction
+
+label_def       := NAME COLON
+
+instruction     := NAME operands?
+operands        := name_operand (COMMA operand)*
+
+operand         := memory
+                 | immediate
+                 | name_operand
+
+memory          := immediate? LEFT_PAREN NAME RIGHT_PAREN
+immediate       := MINUS? NUMBER
+name_operand    := NAME
+
+EOF             := !.
+NEWLINE         := '\n'
+
+NAME            := [a-zA-Z_] [a-zA-Z0-9_]*
+NUMBER          := '0x' [0-9a-fA-F]+
+                 | '0b' [01]+
+                 | [0-9]+
+
+COMMA           := ','
+COLON           := ':'
+MINUS           := '-'
+LEFT_PAREN      := '('
+RIGHT_PAREN     := ')'
