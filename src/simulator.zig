@@ -112,8 +112,9 @@ pub const Machine = struct {
     fn storeWord(self: *Self, word: i32, addr: u32) !void {
         if (addr <= self.prog_len) return error.InstructionOverwrite;
         if (addr >= self.memory.len - 3) return error.InvalidAddress;
-        const as_bytes: [4]u8 = @bitCast(word);
-        @memcpy(self.memory[addr .. addr + 4], &as_bytes);
+        var bytes: [4]u8 = undefined;
+        std.mem.writeInt(i32, &bytes, word, .little);
+        @memcpy(self.memory[addr .. addr + 4], &bytes);
     }
 
     fn fetchWordUnsigned(self: Self, addr: usize) u32 {
