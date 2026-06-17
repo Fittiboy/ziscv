@@ -77,7 +77,7 @@ pub const Machine = struct {
             },
             .itype => |i| switch (i.cmd) {
                 .lw => {
-                    const addr = i.rs1 + i.imm12;
+                    const addr = self.readRegister(i.rs1) + i.imm12;
                     if (addr < 0) return error.InvalidAddress;
                     self.writeRegister(i.rd, self.fetchWord(@intCast(addr)));
                 },
