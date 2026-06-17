@@ -1,5 +1,5 @@
 # ZISC-V
-This is a simplified Assembler and program execution simulator for a small subset of the RV32I instruction set.
+This is a simplified Assembler and Simulator for a small subset of the RV32I instruction set.
 
 It runs on 128KiB of unified instruction and data memory.
 
