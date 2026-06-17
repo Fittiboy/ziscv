@@ -89,7 +89,10 @@ pub const ResolvedInstruction = union(enum) {
     }
 };
 
-const BType = struct {
+pub const RType = Validator.RType;
+pub const IType = Validator.IType;
+pub const SType = Validator.SType;
+pub const BType = struct {
     mnemonic: Validator.Mnemonic,
     rs1: u5,
     rs2: u5,

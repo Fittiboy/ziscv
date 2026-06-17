@@ -1,7 +1,8 @@
 const std = @import("std");
 const file_helper = @import("file_helper.zig");
-const MachineInstruction = @import("assembler.zig").MachineInstruction;
-const Command = @import("assembler.zig").Command;
+const encoder = @import("encoder.zig");
+
+const MachineInstruction = encoder.MachineInstruction;
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
@@ -34,6 +35,7 @@ pub const Machine = struct {
     register_bank: [32]i32 = @splat(0x00000000),
     memory: [32 * 4 * 1024]u8 = undefined,
 
+    pub const Command = enum { add, sub, @"or", @"and", slt, addi, lw, sw, beq };
     const Instruction = union(enum) {
         rtype: struct { cmd: Command, rd: u5, rs1: u5, rs2: u5 },
         itype: struct { cmd: Command, rd: u5, rs1: u5, imm12: i12 },

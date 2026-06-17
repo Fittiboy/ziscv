@@ -6,4 +6,5 @@ test {
     _ = @import("parser.zig");
     _ = @import("validator.zig");
     _ = @import("resolver.zig");
+    _ = @import("encoder.zig");
 }
