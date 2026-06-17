@@ -17,7 +17,6 @@ prep:
     addi x16, zero, 111
     addi x17, zero, 114
     addi x18, zero, 33
-    beq x18, zero, data
 
 memory_writes:
     sw x2, (x1)
