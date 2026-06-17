@@ -93,7 +93,7 @@ fn validateIType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
 }
 
 fn validateLoad(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instruction {
-    const raw_memory, const validated_immediate = try validateLoadOrStore(instruction);
+    const raw_memory, const validated_immediate = try validateLoadOrStore(mnemonic, instruction);
     return .{
         .itype = .{
             .mnemonic = mnemonic,
@@ -105,7 +105,7 @@ fn validateLoad(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructio
 }
 
 fn validateSType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instruction {
-    const raw_memory, const validated_immediate = try validateLoadOrStore(instruction);
+    const raw_memory, const validated_immediate = try validateLoadOrStore(mnemonic, instruction);
     return .{
         .stype = .{
             .mnemonic = mnemonic,
@@ -116,14 +116,21 @@ fn validateSType(mnemonic: Mnemonic, instruction: Parser.Instruction) !Instructi
     };
 }
 
-fn validateLoadOrStore(instruction: Parser.Instruction) !struct { Parser.Memory, i12 } {
+fn validateLoadOrStore(mnemonic: Mnemonic, instruction: Parser.Instruction) !struct { Parser.Memory, i12 } {
     if (instruction.num_operands != 2) return error.WrongNumberOfOperands;
 
     const operands = instruction.operandsSlice();
     if (operands[0] != .register) return error.IncorrectOperandType;
     if (operands[1] != .memory) return error.IncorrectOperandType;
+
     const raw_memory = operands[1].memory;
     const validated_immediate = try validateImmediate(i12, raw_memory.immediate orelse 0);
+
+    switch (mnemonic) {
+        .lw, .sw => if (@mod(validated_immediate, 4) != 0) return error.MisalignedMemoryAccess,
+        else => {},
+    }
+
     return .{ raw_memory, validated_immediate };
 }
 
