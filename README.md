@@ -3,6 +3,11 @@ This is a simplified Assembler and program execution simulator for a small subse
 
 It runs on 128KiB of unified instruction and data memory.
 
+## Why?
+Just for Fun. No, Really.
+
+[![justforfunnoreally.dev badge](https://img.shields.io/badge/justforfunnoreally-dev-9ff)](https://justforfunnoreally.dev)
+
 ## Building
 ### Zig version
 I use the Zig master branch for educational projects like these, so the build script may break.
