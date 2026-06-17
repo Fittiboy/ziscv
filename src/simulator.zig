@@ -99,7 +99,7 @@ pub const Machine = struct {
         }
     }
 
-    fn readRegister(self: Self, reg: u5) i32 {
+    fn readRegister(self: *Self, reg: u5) i32 {
         return self.register_bank[reg];
     }
 
@@ -116,15 +116,15 @@ pub const Machine = struct {
         @memcpy(self.memory[addr .. addr + 4], &bytes);
     }
 
-    fn fetchWordUnsigned(self: Self, addr: usize) u32 {
+    fn fetchWordUnsigned(self: *Self, addr: usize) u32 {
         return @bitCast(self.fetchWord(addr));
     }
 
-    fn fetchWord(self: Self, addr: usize) i32 {
+    fn fetchWord(self: *Self, addr: usize) i32 {
         return std.mem.readInt(i32, self.memory[addr..][0..4], .little);
     }
 
-    fn nextInstruction(self: Self) ?Instruction {
+    fn nextInstruction(self: *Self) ?Instruction {
         if (self.pc == self.prog_len) return null;
         const raw_instruction: u32 = @bitCast(self.fetchWord(self.pc));
         return Self.parseInstruction(raw_instruction);
