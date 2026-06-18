@@ -91,6 +91,7 @@ pub const Machine = struct {
             },
             .btype => |b| {
                 if (self.readRegister(b.rs1) == self.readRegister(b.rs2)) {
+                    if (@mod(b.offset, 4) != 0) return error.InvalidBranchOffset;
                     if (b.offset < 0) {
                         self.pc -= @intCast(-b.offset);
                     } else self.pc += @intCast(b.offset);
