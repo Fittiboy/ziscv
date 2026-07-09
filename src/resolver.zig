@@ -5,7 +5,7 @@ const Validator = @import("validator.zig");
 const ValidatedUnit = Validator.ValidatedUnit;
 pub const RType = Validator.RType;
 pub const IType = Validator.IType;
-pub const SType = Validator.RType;
+pub const SType = Validator.SType;
 
 pub const BType = struct {
     mnemonic: Validator.Mnemonic,
