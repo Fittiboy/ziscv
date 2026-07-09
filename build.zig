@@ -1,8 +1,12 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    var target_query = b.standardTargetOptionsQueryOnly(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const valgrind = b.option(bool, "valgrind", "Compile for Valgrind analysis") orelse false;
+
+    if (valgrind) target_query.cpu_model = .baseline;
+    const target = b.resolveTargetQuery(target_query);
 
     const simulator = b.addExecutable(.{
         .name = "ziscv-simulator",
@@ -10,20 +14,32 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/simulator.zig"),
             .target = target,
             .optimize = optimize,
+
+            // Get some more helpful machinery for analysis
+            .valgrind = if (valgrind) valgrind else null,
+            .strip = if (valgrind) false else null,
+            .omit_frame_pointer = if (valgrind) false else null,
         }),
+        .use_llvm = if (valgrind) true else null,
     });
 
-    const assembler_exe = b.addExecutable(.{
+    const assembler = b.addExecutable(.{
         .name = "ziscv-assembler",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/assembler.zig"),
             .target = target,
             .optimize = optimize,
+
+            // Get some more helpful machinery for analysis
+            .valgrind = if (valgrind) valgrind else null,
+            .strip = if (valgrind) false else null,
+            .omit_frame_pointer = if (valgrind) false else null,
         }),
+        .use_llvm = if (valgrind) true else null,
     });
 
     b.installArtifact(simulator);
-    b.installArtifact(assembler_exe);
+    b.installArtifact(assembler);
 
     const old_zig = @hasField(std.Build, "args");
 
@@ -37,7 +53,7 @@ pub fn build(b: *std.Build) void {
     simulator_run_step.dependOn(&simulator_run.step);
 
     const assembler_run_step = b.step("assemble", "Run the Assembler");
-    const assembler_run = b.addRunArtifact(assembler_exe);
+    const assembler_run = b.addRunArtifact(assembler);
     if (old_zig) {
         assembler_run.addArgs(b.args orelse &.{});
     } else {
