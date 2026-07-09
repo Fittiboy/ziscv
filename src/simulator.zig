@@ -1,8 +1,8 @@
 const std = @import("std");
-const file_helper = @import("file_helper.zig");
-const encoder = @import("encoder.zig");
 
+const encoder = @import("encoder.zig");
 const MachineInstruction = encoder.MachineInstruction;
+const file_helper = @import("file_helper.zig");
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;

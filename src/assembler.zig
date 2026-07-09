@@ -1,11 +1,10 @@
 const std = @import("std");
+const native_os = @import("builtin").os.tag;
+
+const encoder = @import("encoder.zig");
 const file_helper = @import("file_helper.zig");
 const resolver = @import("resolver.zig");
-const encoder = @import("encoder.zig");
-
 const Validator = @import("validator.zig");
-
-const native_os = @import("builtin").os.tag;
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;

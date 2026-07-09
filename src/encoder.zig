@@ -1,6 +1,6 @@
 const std = @import("std");
-const resolver = @import("resolver.zig");
 
+const resolver = @import("resolver.zig");
 const ResolvedInstruction = resolver.ResolvedInstruction;
 
 pub fn encodeInstruction(instruction: ResolvedInstruction) MachineInstruction {

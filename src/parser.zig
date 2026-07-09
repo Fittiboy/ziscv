@@ -1,9 +1,10 @@
 const std = @import("std");
 const mem = std.mem;
 const testing = std.testing;
+const ArrayList = std.ArrayList;
 
 const Tokenizer = @import("tokenizer.zig");
-const ArrayList = std.ArrayList;
+
 const StringMap = std.StaticStringMap(u5);
 
 const Self = @This();

@@ -3,6 +3,28 @@ const mem = std.mem;
 
 const Validator = @import("validator.zig");
 const ValidatedUnit = Validator.ValidatedUnit;
+pub const RType = Validator.RType;
+pub const IType = Validator.IType;
+pub const SType = Validator.RType;
+
+pub const BType = struct {
+    mnemonic: Validator.Mnemonic,
+    rs1: u5,
+    rs2: u5,
+    offset: i13,
+
+    pub fn format(
+        self: @This(),
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        try writer.print("{s} x{d}, x{d}, {d}", .{
+            @tagName(self.mnemonic),
+            self.rs1,
+            self.rs2,
+            self.offset,
+        });
+    }
+};
 
 pub fn resolveProgram(gpa: mem.Allocator, program: []const ValidatedUnit) ![]const ResolvedInstruction {
     var symbol_table: std.StringHashMapUnmanaged(i33) = .empty;
@@ -86,27 +108,5 @@ pub const ResolvedInstruction = union(enum) {
         switch (self) {
             inline else => |inst| try inst.format(writer),
         }
-    }
-};
-
-pub const RType = Validator.RType;
-pub const IType = Validator.IType;
-pub const SType = Validator.SType;
-pub const BType = struct {
-    mnemonic: Validator.Mnemonic,
-    rs1: u5,
-    rs2: u5,
-    offset: i13,
-
-    pub fn format(
-        self: @This(),
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
-        try writer.print("{s} x{d}, x{d}, {d}", .{
-            @tagName(self.mnemonic),
-            self.rs1,
-            self.rs2,
-            self.offset,
-        });
     }
 };
