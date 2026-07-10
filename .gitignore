@@ -3,3 +3,8 @@ zig-out
 debug.bin
 debug.s
 debug_dump.bin
+long.bin
+long.s
+million.bin
+million.s
+million_lines.s
