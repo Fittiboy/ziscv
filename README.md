@@ -10,8 +10,7 @@ Just for Fun. No, Really.
 
 ## Building
 ### Zig version
-The build is tested with Zig 0.16.0, but I personally use the `master` branch, so that I also make it work for that. The
-long–term plan is 0.17.0 compatibility, once it releases. No promises past that.
+Minimum Zig version is 0.16.0, and is verified to work with 0.17.0 as well.
 
 ### Build process
 Run `zig build`, and you will find `ziscv-assembler` and `ziscv-simulator` in `./zig-out/bin/`.
